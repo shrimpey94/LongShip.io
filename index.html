@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Longship.io · Busterrdust</title>
+<meta name="description" content="A tiny Viking .io game. Steer your longship, gather gold, grow your shield wall, grab runestone power-ups and outlast the raiders.">
+<style>
+:root{--ink:#f3ead6;--gold:#e7b54a;--deep:#06192a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--deep);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+canvas{display:block;width:100vw;height:100vh}
+.hud{position:fixed;top:10px;left:12px;font:700 14px/1.35 system-ui;text-shadow:0 1px 3px #000a;pointer-events:none}
+.hud b{color:var(--gold);font-size:18px}
+.buffs{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.buff{display:flex;align-items:center;gap:6px;background:#0008;border-radius:8px;padding:3px 8px 3px 5px;font:600 12px system-ui;width:max-content}
+.buff i{font-style:normal;font-size:15px}
+.buff .bar{width:46px;height:4px;border-radius:2px;background:#ffffff22;overflow:hidden}
+.buff .bar span{display:block;height:100%;background:var(--gold)}
+.board{position:fixed;top:10px;right:12px;background:#0008;border-radius:10px;padding:8px 10px;font:600 12px/1.5 system-ui;min-width:150px;pointer-events:none}
+.board h4{margin:0 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.board .me{color:var(--gold)}
+.board .rogue{color:#ff8a7a}
+#mini{position:fixed;right:12px;bottom:12px;width:120px;height:120px;border-radius:50%;background:#0007;border:2px solid #ffffff22}
+#toast{position:fixed;left:50%;top:18%;transform:translate(-50%,-10px);opacity:0;transition:all .3s;font:800 20px system-ui;text-shadow:0 2px 8px #000;pointer-events:none;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast small{display:block;font:600 13px system-ui;opacity:.85}
+.screen{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,#0b2a3cd0,#06192af0)}
+.card{text-align:center;padding:24px;max-width:440px}
+.card h1{margin:0;font:900 clamp(2.2rem,9vw,3.4rem)/1 system-ui;letter-spacing:.02em}
+.card h1 span{color:var(--gold)}
+#seasonTag{display:none;margin:8px 0 0;font:800 18px system-ui;letter-spacing:.04em}
+#seasonTag small{display:block;font:600 13px system-ui;opacity:.85;margin-top:3px;letter-spacing:0}
+body.season-halloween #seasonTag{display:block;color:#ff8c1a;text-shadow:0 0 14px #ff8c1a88}
+body.season-christmas #seasonTag{display:block;color:#ff6b6b;text-shadow:0 0 14px #ffffff55}
+body.season-halloween .screen{background:radial-gradient(circle at 50% 40%,#2a1840d8,#0d0716f2)}
+body.season-christmas .screen{background:radial-gradient(circle at 50% 40%,#1d4f6ed0,#0a2235f0)}
+body.shorts .hud,body.shorts .board,body.shorts #mini,body.shorts #toast,body.shorts #hud,body.shorts #board{display:none!important}
+body.shorts canvas#c{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2000px #000}
+#recBtn{display:none;position:fixed;right:14px;top:14px;z-index:40;border:0;border-radius:999px;padding:10px 16px;font:800 14px system-ui;background:#c0392b;color:#fff;cursor:pointer}
+body.shorts #recBtn{display:block}
+#recBtn.on{background:#fff;color:#c0392b;animation:recp 1s infinite}
+@keyframes recp{50%{opacity:.6}}
+#recHint{display:none;position:fixed;right:14px;top:58px;z-index:40;font:600 12px system-ui;opacity:.75;max-width:180px;text-align:right}
+body.shorts #recHint{display:block}
+.card p{opacity:.88;margin:10px 0 16px;line-height:1.5}
+.card input{font:600 16px system-ui;padding:12px 14px;border-radius:999px;border:2px solid #ffffff33;background:#0006;color:var(--ink);width:100%;max-width:280px;text-align:center;outline:none}
+.card button{margin-top:12px;font:800 18px system-ui;padding:14px 34px;border-radius:999px;border:0;background:var(--gold);color:#241604;cursor:pointer}
+.card small{display:block;margin-top:12px;opacity:.75;line-height:1.5}
+.card .best{color:var(--gold);font-weight:700}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;text-align:left;font-size:12px;margin:12px auto 0;max-width:340px;opacity:.9}
+.legend span{white-space:nowrap}
+.r0{color:#d5d8dc}.r1{color:#58d68d}.r2{color:#5dade2}.r3{color:#f5b041}
+.hidden{display:none!important}
+#boostBtn{position:fixed;left:16px;bottom:18px;width:76px;height:76px;border-radius:50%;border:2px solid #ffffff44;background:#0007;color:var(--gold);font:800 13px system-ui;display:none}
+@media (pointer:coarse){#boostBtn{display:block}}
+.btn2,.card .btn2{margin-top:10px;font:700 15px system-ui;padding:10px 20px;border-radius:999px;border:2px solid #ffffff33;background:#0006;color:var(--ink);cursor:pointer}
+.plunder{color:var(--gold);font-weight:800}
+#ward{position:fixed;inset:0;z-index:30;background:#06192af2;display:flex;flex-direction:column;align-items:center;overflow:auto;padding:18px 12px 30px}
+#ward .top{display:flex;align-items:center;gap:12px;width:100%;max-width:760px;flex-wrap:wrap}
+#ward h2{margin:0;font:900 26px system-ui;flex:1}
+#ward .tabs{display:flex;gap:6px;width:100%;max-width:760px;margin:12px 0}
+#ward .tabs button{flex:1;padding:10px;border-radius:10px;border:2px solid #ffffff22;background:#0005;color:var(--ink);font:700 14px system-ui;cursor:pointer}
+#ward .tabs button.on{border-color:var(--gold);color:var(--gold)}
+#ward .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%;max-width:760px}
+.skin{background:#0b2a3c;border:2px solid #ffffff1a;border-radius:12px;padding:8px;text-align:center;cursor:pointer;position:relative}
+.skin.eq{border-color:var(--gold)}
+.skin canvas{width:100%;height:auto;display:block;border-radius:8px;background:#124a66}
+.skin b{display:block;margin-top:6px;font-size:14px}
+.skin small{display:block;font-size:11.5px;opacity:.8;min-height:28px;line-height:1.25;margin-top:2px}
+.skin .tag{position:absolute;top:8px;right:8px;background:#000a;border-radius:999px;padding:2px 8px;font:700 11px system-ui}
+.skin.locked canvas{filter:saturate(.55) brightness(.75)}
+.skin button{margin-top:6px;width:100%;padding:7px;border-radius:999px;border:0;font:800 13px system-ui;cursor:pointer;background:var(--gold);color:#241604}
+.skin button:disabled{background:#ffffff22;color:#ffffff88;cursor:default}
+@media (max-width:600px){.board{font-size:10.5px;min-width:0;padding:6px 8px}.board div:nth-child(n+5):not(.me){display:none}#mini{width:86px;height:86px}#toast{font-size:17px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud" id="hud"></div>
+<div class="board" id="board"></div>
+<canvas id="mini" width="240" height="240"></canvas>
+<div id="toast"></div>
+<button id="recBtn" title="Record a vertical clip for TikTok / Shorts">● REC</button><div id="recHint">Shorts mode · 9:16 · press REC, play, press again to save (auto-stops at 59s)</div>
+<div id="ward" class="hidden"><div class="top"><h2>🎨 Wardrobe</h2><span>Plunder: <span class="plunder" data-plunder></span></span><button class="btn2" id="wardClose" style="margin:0">Done</button></div>
+  <div class="tabs"><button data-tab="ships" class="on">Ship skins</button><button data-tab="figs">Figureheads</button></div>
+  <div class="grid" id="wardGrid"></div>
+  <p style="max-width:760px;opacity:.75;font-size:13px;text-align:center;margin-top:14px">Earn plunder every voyage: your shield wall plus 25 for each raider you sink. Spend it here, or unlock the special skins by pulling off their feats.</p></div>
+<button id="boostBtn" aria-label="Row hard (boost)">ROW!</button>
+
+<div class="screen" id="start"><div class="card">
+  <h1>LONG<span>SHIP</span>.io</h1>
+  <div id="seasonTag"></div>
+  <p>Gather drifting gold to grow your shield wall. If your prow touches another ship's shields or a rocky isle, you sink. Most raiders sail careful, but watch for the <b style="color:#ff8a7a">☠ rogues</b>.</p>
+  <input id="name" maxlength="14" placeholder="Your Viking name" autocomplete="off">
+  <br><button id="go">Set sail</button><br><button class="btn2" id="wardBtn">🎨 Wardrobe · <span class="plunder" data-plunder></span> plunder</button>
+  <div class="legend">
+    <span class="r0">⛵ Swift Oars · common</span><span class="r0">🧲 Odin's Pull · common</span>
+    <span class="r1">🍖 Feast · uncommon</span><span class="r1">🛡️ Thor's Ward · uncommon</span>
+    <span class="r2">👻 Ghost Ship · rare</span><span class="r2">🍺 Mead of Plenty · rare</span>
+    <span class="r3">⚡ Mjölnir · legendary</span>
+  </div>
+  <small>Steer with the mouse, a finger drag, or WASD / arrow keys<br>Row hard: hold click, Space, or ROW! (costs shields)</small>
+  <small id="bestLine"></small>
+</div></div>
+
+<div class="screen hidden" id="over"><div class="card">
+  <h1>Sunk!</h1>
+  <p id="overText"></p>
+  <button id="again">Sail again</button><br><button class="btn2" id="wardBtn2">🎨 Wardrobe · <span class="plunder" data-plunder></span> plunder</button>
+  <small><a href="/games/" target="_top" style="color:var(--gold)">Back to Busterrdust Games</a> · <a href="/games/vikingvale" target="_blank" rel="noopener" style="color:var(--gold)">Play VikingVale</a></small>
+</div></div>
+
+<script>
+(() => {
+  /* ===================== seasons =====================
+     Switches automatically by date. Override for testing / recording: ?season=halloween | christmas | none
+     Seasonal skins can only be EARNED during their season, but once earned they're yours forever. */
+  const QS = new URLSearchParams(location.search);
+  const SEASON = (() => { const q = QS.get("season"); if (q === "none") return null; if (q === "halloween" || q === "christmas") return q;
+    const d = new Date(), m = d.getMonth() + 1, day = d.getDate();
+    if (m === 10 || (m === 11 && day <= 2)) return "halloween";
+    if ((m === 11 && day >= 20) || m === 12 || (m === 1 && day <= 2)) return "christmas";
+    return null; })();
+  const THEMES = {
+    halloween: { tag: "🎃 HALLOWED SEAS", sub: "The dead have set sail. Limited-time skins until November 2.", toast: ["🎃 Hallowed Seas!", "Beware the Flying Dutchman..."],
+      sea: ["#2b1846", "#0c0616"], wave: "rgba(196,150,255,.075)", edge: "rgba(6,2,12,.62)", line: "rgba(255,140,26,.35)",
+      isle: { shallow: "rgba(150,90,210,.16)", sand: "#4a3b2d", grass: "#2a2620", rock: "#3d3846", tree: "#15100c" }, decor: "pumpkin", sky: "bats", fog: true,
+      boss: { name: "👻 The Flying Dutchman", len: 110, skin: "ghost", fig: "skull", ach: "h_dutch" },
+      rogues: ["💀 Bonejaw", "💀 Grimtooth", "💀 Rattlebones", "💀 Hollow Eye"], rogueSkin: "bone", treatAch: "h_treats", runsAch: "h_runs3", runsKey: "hRuns" },
+    christmas: { tag: "🎄 YULE RAID", sub: "Plunder the frozen fjords. Limited-time skins until January 2.", toast: ["🎄 Yule Raid!", "Krampus prowls the ice..."],
+      sea: ["#1f5878", "#0a2235"], wave: "rgba(255,255,255,.09)", edge: "rgba(4,16,28,.55)", line: "rgba(255,255,255,.4)",
+      isle: { shallow: "rgba(220,240,255,.28)", sand: "#eef5fb", grass: "#d9e7f2", rock: "#9fb0c0", tree: "#1f5a33" }, decor: "presents", sky: "snow", fog: false,
+      boss: { name: "😈 Krampus", len: 110, skin: "krampus", fig: "skull", ach: "x_krampus" },
+      rogues: ["😈 Krampus's Imp", "❄️ Frost Thrall", "❄️ Ice Wraith", "😈 Coal Fiend"], rogueSkin: "krampus", treatAch: "x_treats", runsAch: "x_runs3", runsKey: "xRuns" },
+  };
+  const TH = SEASON ? THEMES[SEASON] : null;
+  if (SEASON) { document.body.classList.add("season-" + SEASON); document.title = "Longship.io · " + (SEASON === "halloween" ? "Hallowed Seas" : "Yule Raid"); }
+  const SHORTS = QS.get("shorts") === "1";
+  if (SHORTS) document.body.classList.add("shorts");
+
+  /* ===================== tuning ===================== */
+  const W = 8000;                 // world size (was 3200)
+  const SPEED = 1.15, BOOST = 2.3; // px per frame at 60fps (was 2.6 / 5.2)
+  const TURN = 0.045;
+  const BASE_LEN = 8, BOTS = 34, ROGUES = 1 + ((Math.random() * 3) | 0);   // 1-3 rogue raiders
+  const GOLD_TARGET = 5000, ISLES = 22, POWER_TARGET = 34;
+  const POWERS = [   // rarity 0 common .. 3 legendary
+    { id: "oars",   icon: "⛵", name: "Swift Oars",     r: 0, w: 30, dur: 8,  note: "Row faster for free" },
+    { id: "magnet", icon: "🧲", name: "Odin's Pull",    r: 0, w: 26, dur: 12, note: "Nearby gold drifts to you" },
+    { id: "feast",  icon: "🍖", name: "Feast",          r: 1, w: 15, dur: 0,  note: "+12 shields" },
+    { id: "ward",   icon: "🛡️", name: "Thor's Ward",    r: 1, w: 13, dur: 20, note: "Survive one crash" },
+    { id: "ghost",  icon: "👻", name: "Ghost Ship",     r: 2, w: 7,  dur: 7,  note: "Sail through ships" },
+    { id: "mead",   icon: "🍺", name: "Mead of Plenty", r: 2, w: 6,  dur: 15, note: "Gold counts double" },
+    { id: "mjolnir",icon: "⚡", name: "Mjölnir",        r: 3, w: 3,  dur: 0,  note: "Lightning sinks the nearest rival" },
+  ];
+  const RCOL = ["#d5d8dc", "#58d68d", "#5dade2", "#f5b041"];
+  // loot drifting at sea (value = how much it grows you; 3 value = 1 shield)
+  const LOOT = { coin: { v: 1, w: 80 }, silver: { v: 2, w: 9 }, amber: { v: 3, w: 5 }, gem: { v: 5, w: 3.5 }, goblet: { v: 8, w: 1.6 }, horn: { v: 12, w: .7 }, chest: { v: 25, w: 0 } };
+  const LOOT_SPAWN = Object.entries(LOOT).filter(([, o]) => o.w > 0), LOOT_W = LOOT_SPAWN.reduce((a, [, o]) => a + o.w, 0);
+  const GEM_HUES = [350, 140, 210, 280];
+  // ship skins: a/b = shield colors, sail = [cloth, stripes], pat = shield pattern
+  const SKINS = [
+    { id: "fjord",   name: "Fjord Red",     a: "#c0392b", b: "#f5d76e", sail: ["#f5d76e", "#c0392b"], pat: "alt",    un: { t: "free" } },
+    { id: "glacier", name: "Glacier Blue",  a: "#2e86c1", b: "#f4f6f7", sail: ["#f4f6f7", "#2e86c1"], pat: "cross",  un: { t: "free" } },
+    { id: "forest",  name: "Forest Green",  a: "#27ae60", b: "#f9e79f", sail: ["#f9e79f", "#1e8449"], pat: "split",  un: { t: "free" } },
+    { id: "raven",   name: "Raven Black",   a: "#1c1c1c", b: "#7f8c8d", sail: ["#2c2c2c", "#bdc3c7"], pat: "alt",    un: { t: "buy", cost: 400 } },
+    { id: "frost",   name: "Frost Giant",   a: "#d6eaf8", b: "#85c1e9", sail: ["#ebf5fb", "#5dade2"], pat: "rings",  un: { t: "buy", cost: 900 } },
+    { id: "jarl",    name: "Golden Jarl",   a: "#d4ac0d", b: "#fdfefe", sail: ["#fdfefe", "#d4ac0d"], pat: "cross",  glow: "#f7dc6f", un: { t: "buy", cost: 1500 } },
+    { id: "aurora",  name: "Aurora",        a: "#58d68d", b: "#a569bd", sail: ["#1b2631", "#58d68d"], pat: "rainbow", un: { t: "buy", cost: 3000 } },
+    { id: "thunder", name: "Thunder God",   a: "#6c3483", b: "#f4d03f", sail: ["#4a235a", "#f4d03f"], pat: "bolt",   glow: "#d2b4de", un: { t: "ach", key: "mjolnir", label: "Strike a rival with ⚡ Mjölnir" } },
+    { id: "kraken",  name: "Kraken",        a: "#117a65", b: "#0b1f1a", sail: ["#0e3b33", "#48c9b0"], pat: "spiral", un: { t: "ach", key: "len150", label: "Grow a 150-shield wall" } },
+    { id: "blood",   name: "Bloodaxe",      a: "#7b241c", b: "#17202a", sail: ["#17202a", "#c0392b"], pat: "split",  un: { t: "ach", key: "kills5", label: "Sink 5 raiders in one voyage" } },
+    { id: "ember",   name: "Ember",         a: "#e67e22", b: "#922b21", sail: ["#922b21", "#f5b041"], pat: "flame",  un: { t: "ach", key: "runs10", label: "Sail 10 voyages" } },
+    { id: "valhalla",name: "Valhalla",      a: "#f7dc6f", b: "#fef9e7", sail: ["#fef9e7", "#f1c40f"], pat: "rings",  glow: "#fff3b0", un: { t: "ach", key: "top1", label: "Become the mightiest raider (#1)" } },
+    // 🎃 Halloween (earnable only Oct 1 – Nov 2)
+    { id: "ghost",   name: "Ghost Ship",    a: "#c8f7dc", b: "#7ee8b0", sail: ["#e8fff2", "#7ee8b0"], pat: "rings",  glow: "#9cffc8", ghostly: true, season: "halloween", un: { t: "ach", key: "h_dutch", label: "Sink the Flying Dutchman" } },
+    { id: "bone",    name: "Bone Raft",     a: "#efe9da", b: "#232323", sail: ["#1a1a1a", "#efe9da"], pat: "skull",  season: "halloween", un: { t: "ach", key: "h_treats", label: "Gather 150 treats in one voyage" } },
+    { id: "pumpkin", name: "Pumpkin Patch", a: "#ff7a00", b: "#ff9a2e", sail: ["#2d1b00", "#ff7a00"], pat: "jack",   glow: "#ffb15c", season: "halloween", un: { t: "buy", cost: 500 } },
+    // 🎄 Christmas (earnable only Nov 20 – Jan 2)
+    { id: "candycane", name: "Candy Cane",  a: "#e74c3c", b: "#ffffff", sail: ["#ffffff", "#e74c3c"], pat: "stripe", season: "christmas", un: { t: "buy", cost: 500 } },
+    { id: "frostbite", name: "Frostbite",   a: "#bfe9ff", b: "#ffffff", sail: ["#eaf7ff", "#5dade2"], pat: "snowflake", glow: "#d6f2ff", season: "christmas", un: { t: "ach", key: "x_krampus", label: "Sink Krampus" } },
+    { id: "ginger",  name: "Gingerbread",   a: "#b9773d", b: "#9a5f2c", sail: ["#fff4e0", "#b9773d"], pat: "icing",  season: "christmas", un: { t: "ach", key: "x_treats", label: "Gather 150 treats in one voyage" } },
+  ];
+  const BOSS_SKINS = { krampus: { id: "krampus", a: "#5b0f0f", b: "#111111", sail: ["#111111", "#a93226"], pat: "cross", glow: "#c0392b" } };
+  const SEASON_LABEL = { halloween: "🎃 Halloween only", christmas: "🎄 Christmas only" };
+  const FIGS = [
+    { id: "dragon",  name: "Dragon",  un: { t: "free" } },
+    { id: "wolf",    name: "Wolf",    un: { t: "free" } },
+    { id: "serpent", name: "Sea Serpent", un: { t: "buy", cost: 300 } },
+    { id: "ravenh",  name: "Raven",   un: { t: "buy", cost: 600 } },
+    { id: "bear",    name: "Bear",    un: { t: "ach", key: "sinks25", label: "Sink 25 raiders in total" } },
+    { id: "skull",   name: "Skull",   un: { t: "ach", key: "rogue", label: "Sink a ☠ rogue" } },
+    { id: "jack",    name: "Jack-o'-Lantern", season: "halloween", un: { t: "ach", key: "h_runs3", label: "Sail 3 voyages in October" } },
+    { id: "bat",     name: "Bat",     season: "halloween", un: { t: "buy", cost: 250 } },
+    { id: "reindeer",name: "Reindeer", season: "christmas", un: { t: "ach", key: "x_runs3", label: "Sail 3 voyages in December" } },
+    { id: "snowman", name: "Snowman", season: "christmas", un: { t: "buy", cost: 250 } },
+  ];
+  const inSeason = it => !it.season || it.season === SEASON;
+  const ROGUE_SKIN = { id: "rogue", a: "#1b1b1b", b: "#c0392b", sail: ["#1b1b1b", "#c0392b"], pat: "cross" };
+  const NAMES = ["Ragnhild", "Bjorn", "Sigrid", "Ulf", "Astrid", "Leif", "Freydis", "Hakon", "Gunnar", "Thyra", "Eirik", "Solveig", "Knut", "Ingrid",
+    "Halfdan", "Brynja", "Orm", "Dagny", "Sven", "Yrsa", "Torvald", "Gudrun", "Arne", "Hilda", "Rolf", "Signy", "Asger", "Liv"];
+  const ROGUE_NAMES = ["Hrafn the Grim", "Skarde Bloodaxe", "Ivar Boneless", "Grima Wolfsbane"];
+  const COLORS = [["#c0392b", "#f5d76e"], ["#2e86c1", "#f4f6f7"], ["#27ae60", "#f9e79f"], ["#8e44ad", "#f5cba7"], ["#d35400", "#fdebd0"],
+                  ["#16a085", "#fadbd8"], ["#1f618d", "#f9e79f"], ["#7d3c98", "#d5f5e3"], ["#a04000", "#d6dbdf"], ["#117864", "#f6ddcc"]];
+
+  /* ===================== setup ===================== */
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  if (!ctx.roundRect) ctx.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
+  const mini = document.getElementById("mini"), mctx = mini.getContext("2d");
+  const $ = id => document.getElementById(id);
+  let dpr = 1, vw = 0, vh = 0;
+  function resize() {
+    if (SHORTS) { dpr = 2; vw = 540; vh = 960; cv.width = 1080; cv.height = 1920;   // 1080x1920 vertical video frame
+      const h = Math.min(innerHeight, innerWidth * 16 / 9); cv.style.height = h + "px"; cv.style.width = h * 9 / 16 + "px"; return; }
+    dpr = Math.min(2, window.devicePixelRatio || 1); vw = innerWidth; vh = innerHeight; cv.width = vw * dpr; cv.height = vh * dpr; }
+  addEventListener("resize", resize); resize();
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  // saved progress on this device: plunder, unlocks, equipped look, lifetime stats
+  const prof = (() => { let p = null; try { p = JSON.parse(store.get("ls_profile") || "null"); } catch (e) {}
+    p = p || {}; p.plunder = p.plunder || 0; p.owned = p.owned || []; p.ach = p.ach || {}; p.eq = p.eq || { skin: "fjord", fig: "dragon" };
+    p.stats = p.stats || { runs: 0, sinks: 0 }; return p; })();
+  const saveProf = () => store.set("ls_profile", JSON.stringify(prof));
+  const unlocked = it => it.un.t === "free" || prof.owned.includes(it.id) || (it.un.t === "ach" && prof.ach[it.un.key]);
+  function achieve(key) {
+    if (prof.ach[key]) return; prof.ach[key] = true; saveProf();
+    const it = [...SKINS, ...FIGS].find(x => x.un.t === "ach" && x.un.key === key);
+    if (it) setTimeout(() => toast(`🏆 Unlocked: ${it.name}!`, "Equip it in the Wardrobe"), 1200);
+  }
+  const rnd = (a, b) => a + Math.random() * (b - a), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+  const d2 = (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2;
+
+  let ships = [], gold = [], powers = [], isles = [], bolts = [], player = null, running = false, tick = 0;
+  const input = { x: 0, y: 0, boost: false, active: false }, cam = { x: W / 2, y: W / 2, z: 1 };
+
+  /* ----- spatial grids (rebuilt each frame) so 25 ships x 4000 coins stays fast ----- */
+  const CELL = 160, GN = Math.ceil(W / CELL);
+  let segGrid = new Map(), goldGrid = new Map();
+  const key = (cx, cy) => cy * GN + cx;
+  function gridAdd(g, x, y, v) { const k = key(clamp((x / CELL) | 0, 0, GN - 1), clamp((y / CELL) | 0, 0, GN - 1)); let a = g.get(k); if (!a) g.set(k, a = []); a.push(v); }
+  function gridNear(g, x, y, r, fn) {
+    const x0 = clamp(((x - r) / CELL) | 0, 0, GN - 1), x1 = clamp(((x + r) / CELL) | 0, 0, GN - 1);
+    const y0 = clamp(((y - r) / CELL) | 0, 0, GN - 1), y1 = clamp(((y + r) / CELL) | 0, 0, GN - 1);
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const a = g.get(key(cx, cy)); if (a) for (const v of a) if (fn(v) === false) return; }
+  }
+
+  /* ===================== world ===================== */
+  function makeIsles() {
+    isles = [];
+    for (let i = 0; i < ISLES; i++) {
+      const r = rnd(70, 190), x = rnd(400, W - 400), y = rnd(400, W - 400);
+      if (isles.some(o => Math.hypot(o.x - x, o.y - y) < o.r + r + 400)) { i--; continue; }
+      const pts = []; for (let k = 0; k < 14; k++) pts.push(r * rnd(.82, 1.12));
+      isles.push({ x, y, r, pts, trees: Array.from({ length: (r / 35) | 0 }, () => [rnd(-.5, .5) * r, rnd(-.5, .5) * r]) });
+    }
+  }
+  const inIsle = (x, y, pad) => isles.some(o => d2(x, y, o.x, o.y) < (o.r + pad) ** 2);
+  function freeSpot(pad, edge = 300) { for (let t = 0; t < 60; t++) { const x = rnd(edge, W - edge), y = rnd(edge, W - edge); if (!inIsle(x, y, pad)) return [x, y]; } return [W / 2, W / 2]; }
+  function spawnGold(n, x, y, spread, big) {
+    for (let i = 0; i < n; i++) {
+      let gx, gy;
+      if (x === undefined) { [gx, gy] = freeSpot(20); gx += rnd(-200, 200); gy += rnd(-200, 200); }
+      else { gx = x + rnd(-spread, spread); gy = y + rnd(-spread, spread); }
+      gx = clamp(gx, 30, W - 30); gy = clamp(gy, 30, W - 30); if (inIsle(gx, gy, 6)) continue;
+      let type = big || "coin";
+      if (x === undefined) { let pick = Math.random() * LOOT_W; for (const [k, o] of LOOT_SPAWN) { pick -= o.w; if (pick <= 0) { type = k; break; } } }
+      addLoot(type, gx, gy, x !== undefined && big ? 1 : 0);
+    }
+  }
+  function addLoot(type, x, y, glow) {
+    gold.push({ x, y, type, v: LOOT[type].v, t: Math.random() * 6, h: GEM_HUES[(Math.random() * 4) | 0], glow: glow ? 60 * 25 : 0 });
+  }
+  // a sunk ship spills its plunder along its hull: bigger ships leave bigger piles with chests and treasure
+  function dropPlunder(s) {
+    let total = Math.round(s.len * 3 * .8), i = 0;
+    const segs = s.segs.length ? s.segs : [{ x: s.x, y: s.y }];
+    const chests = Math.floor(s.len / 45);
+    for (let c = 0; c < chests && total >= 25; c++) { const p = segs[Math.floor(Math.random() * segs.length)];
+      if (!inIsle(p.x, p.y, 10)) { addLoot("chest", p.x + rnd(-10, 10), p.y + rnd(-10, 10), 1); total -= 25; } }
+    const order = ["horn", "goblet", "gem", "amber", "silver", "coin"];
+    let guard = 0;
+    while (total > 0 && guard++ < 2000) {
+      const p = segs[i++ % segs.length], room = order.filter(k => LOOT[k].v <= total);
+      const k = Math.random() < .55 ? "coin" : room[Math.floor(Math.random() * room.length)] || "coin";
+      const x = clamp(p.x + rnd(-14, 14), 20, W - 20), y = clamp(p.y + rnd(-14, 14), 20, W - 20);
+      if (!inIsle(x, y, 6)) addLoot(k, x, y, 1); total -= LOOT[k].v;
+    }
+  }
+  function spawnPower() {
+    let tot = POWERS.reduce((a, p) => a + p.w, 0), pick = Math.random() * tot, p = POWERS[0];
+    for (const q of POWERS) { pick -= q.w; if (pick <= 0) { p = q; break; } }
+    const [x, y] = freeSpot(60);
+    powers.push({ x, y, p, life: 60 * rnd(40, 75), t: Math.random() * 6 });
+  }
+
+  function makeShip(name, kind) {
+    const [x, y] = freeSpot(260, 700), a = rnd(0, Math.PI * 2);
+    const pool = SKINS.filter(inSeason), seasonalRogue = TH && (SKINS.find(k => k.id === TH.rogueSkin) || BOSS_SKINS[TH.rogueSkin]);
+    const skin = kind === "rogue" ? (seasonalRogue || ROGUE_SKIN) : kind === "player" ? (SKINS.find(k => k.id === prof.eq.skin && unlocked(k)) || SKINS[0]) : pool[(Math.random() * pool.length) | 0];
+    const figPool = FIGS.filter(f => inSeason(f) && f.id !== "skull");
+    const fig = kind === "rogue" ? "skull" : kind === "player" ? (FIGS.find(f => f.id === prof.eq.fig && unlocked(f)) || FIGS[0]).id : figPool[(Math.random() * figPool.length) | 0].id;
+    const s = { name, kind, isPlayer: kind === "player", x, y, a, target: a, len: BASE_LEN, path: [], skin, fig, alive: true, score: 0, kills: 0, peak: BASE_LEN,
+                think: 0, boosting: false, fleeT: 0, buffs: {}, ward: 0, segs: [] };
+    for (let i = 0; i < 160; i++) s.path.push({ x: x - Math.cos(a) * i * 1.5, y: y - Math.sin(a) * i * 1.5 });
+    return s;
+  }
+  const radius = s => 9 + Math.min(15, Math.sqrt(s.len) * 1.25);
+  const gap = s => 11 * radius(s) / 11;
+  function buildSegs(s) {
+    const out = [{ x: s.path[0].x, y: s.path[0].y }], sp = gap(s);
+    let acc = 0, prev = s.path[0], k = 1;
+    while (out.length <= s.len && k < s.path.length) {
+      const p = s.path[k], d = Math.hypot(p.x - prev.x, p.y - prev.y);
+      if (acc + d >= sp) { out.push({ x: p.x, y: p.y }); acc = 0; } else acc += d;
+      prev = p; k++;
+    }
+    if (s.path.length > k + 60) s.path.length = k + 60;
+    s.segs = out;
+  }
+
+  function start() {
+    const nm = ($("name").value.trim() || "You").slice(0, 14); store.set("ls_name", nm);
+    setupWorld(); player = makeShip(nm, "player"); ships.push(player);
+    cam.x = player.x; cam.y = player.y; cam.z = 1; running = true;
+    $("start").classList.add("hidden"); $("over").classList.add("hidden");
+    if (TH) toast(TH.toast[0], TH.toast[1]); else toast("⛵ Set sail!", "Gather gold. Avoid shields and rocks.");
+  }
+  function setupWorld() {
+    ships = []; gold = []; powers = []; bolts = []; makeIsles(); spawnGold(GOLD_TARGET);
+    for (let i = 0; i < POWER_TARGET; i++) spawnPower();
+    const pool = NAMES.slice().sort(() => Math.random() - .5);
+    for (let i = 0; i < BOTS; i++) { const b = makeShip(pool[i % pool.length], "bot"); b.len = BASE_LEN + ((Math.random() * 40) | 0); ships.push(b); }
+    const rp = (TH ? TH.rogues : ROGUE_NAMES.map(n => "☠ " + n)).slice().sort(() => Math.random() - .5);
+    for (let i = 0; i < ROGUES; i++) { const r = makeShip(rp[i], "rogue"); r.len = 30 + ((Math.random() * 30) | 0); ships.push(r); }
+    if (TH) ships.push(makeBoss());
+  }
+
+  function makeBoss() {
+    const b = makeShip(TH.boss.name, "rogue"); b.boss = true; b.len = TH.boss.len;
+    b.skin = SKINS.find(k => k.id === TH.boss.skin) || BOSS_SKINS[TH.boss.skin]; b.fig = TH.boss.fig; return b;
+  }
+  function sink(s, by, how) {
+    if (!s.alive) return;
+    if (s.ward > 0 && how !== "bolt") { s.ward = 0; delete s.buffs.ward; s.invuln = 90; if (s.isPlayer) toast("🛡️ Thor's Ward saved you!"); return; }
+    s.alive = false;
+    dropPlunder(s);
+    if (by) { by.kills++;
+      if (by.isPlayer) { prof.stats.sinks++; if (s.kind === "rogue") achieve("rogue"); if (s.boss && TH) { achieve(TH.boss.ach); setTimeout(() => toast(`🏆 You sank ${s.name}!`, "Its treasure is yours"), 300); } if (by.kills >= 5) achieve("kills5"); if (prof.stats.sinks >= 25) achieve("sinks25"); saveProf(); } }
+    if (s.isPlayer) {
+      running = false; const best = Math.max(+store.get("ls_best") || 0, s.peak || s.len); store.set("ls_best", best);
+      const earned = (s.peak || s.len) + s.kills * 25; prof.plunder += earned; prof.stats.runs++; if (prof.stats.runs >= 10) achieve("runs10");
+      if (TH) { prof.stats[TH.runsKey] = (prof.stats[TH.runsKey] || 0) + 1; if (prof.stats[TH.runsKey] >= 3) achieve(TH.runsAch); } saveProf(); showPlunder();
+      const why = how === "rock" ? "Ran aground on a rocky isle." : how === "edge" ? "Sailed off the edge of the world." : how === "bolt" ? "Struck by lightning." : `Crashed into <b>${by ? by.name : "a ship"}</b>.`;
+      $("overText").innerHTML = `Biggest shield wall: <b>${s.peak || s.len}</b> · Raiders sunk: <b>${s.kills}</b><br>${why}<br>Best ever: <b>${best}</b>` +
+        `<br><span class="plunder">+${earned} plunder</span> <span style="opacity:.75">(${s.peak || s.len} wall + ${s.kills * 25} for sinks)</span>`;
+      setTimeout(() => $("over").classList.remove("hidden"), 900);
+    } else {
+      if (by && by.isPlayer) toast(`⚔️ ${s.name} sank!`);
+      setTimeout(() => { const i = ships.indexOf(s); if (i < 0) return; const n = s.boss ? makeBoss() : makeShip(s.name, s.kind);
+        if (!s.boss) { n.len = s.kind === "rogue" ? 25 : BASE_LEN + ((Math.random() * 15) | 0); if (s.kind === "rogue") { n.skin = s.skin; } }
+        ships[i] = n; if (s.boss) toast(`${n.name} has returned...`); }, s.boss ? 45000 : 4000);
+    }
+  }
+
+  /* ===================== bot brains =====================
+     Every bot scores 13 possible headings and picks the safest one that still leads somewhere useful.
+     Careful raiders: never chase ships, flee from anything heading at them, only boost to escape.
+     Rogues: same survival instincts, but they cut in front of smaller ships and boost to do it. */
+  function danger(b, x, y, margin) {
+    if (x < 120 || y < 120 || x > W - 120 || y > W - 120) return 3;
+    for (const o of isles) if (d2(x, y, o.x, o.y) < (o.r + margin + 30) ** 2) return 3;
+    let hit = 0;
+    gridNear(segGrid, x, y, margin + 30, v => {
+      if (v.s === b && v.i < 10) return;
+      const rr = (radius(v.s) + margin) ** 2;
+      if (d2(x, y, v.x, v.y) < rr) { hit = v.s.buffs.ghost && v.s !== b ? 0 : 2; return false; }
+    });
+    return hit;
+  }
+  function botThink(b) {
+    if (--b.think > 0) return; b.think = 5 + ((Math.random() * 4) | 0);
+    const r = radius(b), rogue = b.kind === "rogue";
+    // 1) goal direction
+    let goal = null, why = "wander";
+    // threats: heads near us pointing our way (bigger ones scarier)
+    let threat = null, tBest = 1e9;
+    for (const o of ships) { if (o === b || !o.alive) continue; const dd = d2(o.x, o.y, b.x, b.y);
+      if (dd > 380 * 380) continue;
+      const toMe = Math.atan2(b.y - o.y, b.x - o.x), facing = Math.abs(angDiff(o.a, toMe)) < .7;
+      if ((facing || o.kind === "rogue") && (o.len >= b.len * .7 || o.kind === "rogue") && dd < tBest) { tBest = dd; threat = o; } }
+    if (threat && !rogue) { goal = Math.atan2(b.y - threat.y, b.x - threat.x); why = "flee"; b.fleeT = 50; }
+    else if (rogue) {
+      let prey = null, pBest = 1e9;
+      for (const o of ships) { if (o === b || !o.alive || o.kind === "rogue") continue; if (o.len > b.len + 15) continue;
+        const dd = d2(o.x, o.y, b.x, b.y); if (dd < 700 * 700 && dd < pBest) { pBest = dd; prey = o; } }
+      if (prey) { const lead = 90 + radius(prey) * 3; goal = Math.atan2(prey.y + Math.sin(prey.a) * lead - b.y, prey.x + Math.cos(prey.a) * lead - b.x); why = "hunt"; }
+    }
+    if (goal === null) {
+      // safest nearby gold / power-up: prefer ones away from other ships
+      let best = null, score = 1e9;
+      gridNear(goldGrid, b.x, b.y, 420, g => { const dd = d2(g.x, g.y, b.x, b.y); const s = dd / (1 + g.v * .4); if (s < score) { score = s; best = g; } });
+      for (const p of powers) { const dd = d2(p.x, p.y, b.x, b.y); if (dd < 500 * 500 && dd * .3 < score) { score = dd * .3; best = p; } }
+      if (best) { goal = Math.atan2(best.y - b.y, best.x - b.x); why = "feed"; }
+      else { b.wander = (b.wander ?? b.a) + rnd(-.4, .4); goal = b.wander; }
+    }
+    // 2) pick the safest heading close to the goal
+    let bestA = goal, bestScore = -1e9;
+    for (let k = -6; k <= 6; k++) {
+      const a = b.a + k * .26, cost = Math.abs(angDiff(a, goal)) * 1.2 + Math.abs(k) * .05;
+      let risk = 0;
+      for (const dist of [r * 1.6 + 20, r * 2.4 + 55, r * 3.2 + 100, r * 4 + 160]) {
+        const dg = danger(b, b.x + Math.cos(a) * dist, b.y + Math.sin(a) * dist, r * .9 + 10);
+        risk += dg * (dist < 100 ? 6 : dist < 170 ? 3 : 1.4);
+      }
+      // keep clear of other prows' projected paths
+      for (const o of ships) { if (o === b || !o.alive) continue; if (d2(o.x, o.y, b.x, b.y) > 300 * 300) continue;
+        const px = o.x + Math.cos(o.a) * 70, py = o.y + Math.sin(o.a) * 70, qx = b.x + Math.cos(a) * 70, qy = b.y + Math.sin(a) * 70;
+        if (d2(px, py, qx, qy) < (r + radius(o) + 30) ** 2) risk += rogue ? 1 : 4; }
+      const sc = -risk * 10 - cost;
+      if (sc > bestScore) { bestScore = sc; bestA = a; }
+    }
+    b.target = bestA;
+    // 3) boost only to escape (careful) or to close a cut-off (rogue)
+    const canBoost = b.len > BASE_LEN + 6;
+    b.boosting = canBoost && ((why === "flee" && tBest < 200 * 200) || (rogue && why === "hunt" && Math.random() < .5) || bestScore < -40);
+  }
+
+  /* ===================== input ===================== */
+  function aimAt(cx, cy) { const rc = cv.getBoundingClientRect(); input.x = (cx - rc.left) / rc.width * vw - vw / 2; input.y = (cy - rc.top) / rc.height * vh - vh / 2; input.active = true; }
+  cv.addEventListener("mousemove", e => aimAt(e.clientX, e.clientY));
+  cv.addEventListener("mousedown", () => input.boost = true); addEventListener("mouseup", () => input.boost = false);
+  let ts = null;
+  cv.addEventListener("touchstart", e => { const t = e.touches[0]; ts = { x: t.clientX, y: t.clientY }; e.preventDefault(); }, { passive: false });
+  cv.addEventListener("touchmove", e => { const t = e.touches[0]; if (!ts) return; const dx = t.clientX - ts.x, dy = t.clientY - ts.y;
+    if (dx * dx + dy * dy > 64) { input.x = dx; input.y = dy; input.active = true; } e.preventDefault(); }, { passive: false });
+  cv.addEventListener("touchend", () => { ts = null; });
+  const bb = $("boostBtn");
+  bb.addEventListener("touchstart", e => { input.boost = true; e.preventDefault(); }, { passive: false });
+  bb.addEventListener("touchend", e => { input.boost = false; e.preventDefault(); }, { passive: false });
+  const keys = new Set();
+  addEventListener("keydown", e => { if (e.code === "Space") { input.boost = true; e.preventDefault(); } keys.add(e.code); });
+  addEventListener("keyup", e => { if (e.code === "Space") input.boost = false; keys.delete(e.code); });
+
+  /* ===================== power-ups ===================== */
+  function grant(s, p) {
+    if (p.id === "feast") s.len += 12;
+    else if (p.id === "ward") { s.ward = 1; s.buffs.ward = { t: p.dur * 60, max: p.dur * 60 }; }
+    else if (p.id === "mjolnir") {
+      let tgt = null, best = 1e9;
+      for (const o of ships) { if (o === s || !o.alive) continue; const dd = d2(o.x, o.y, s.x, s.y); if (dd < 900 * 900 && dd < best) { best = dd; tgt = o; } }
+      if (tgt) { bolts.push({ x1: s.x, y1: s.y, x2: tgt.x, y2: tgt.y, t: 30 }); sink(tgt, s, "bolt"); if (s.isPlayer) achieve("mjolnir"); }
+    } else s.buffs[p.id] = { t: p.dur * 60, max: p.dur * 60 };
+    if (s.isPlayer) toast(`${p.icon} ${p.name}!`, p.note);
+  }
+  let toastT = 0;
+  let canvasToast = null;
+  function toast(a, b) { canvasToast = { a: a.replace(/<[^>]+>/g, ""), b: (b || "").replace(/<[^>]+>/g, ""), t: 120 }; const t = $("toast"); t.innerHTML = a + (b ? `<small>${b}</small>` : ""); t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1800); }
+
+  /* ===================== simulation ===================== */
+  function step(f) {   // f = frames elapsed at 60fps (keeps speed the same on 60Hz and 120Hz screens)
+    tick += f;
+    if (running && player.alive) {
+      let kx = 0, ky = 0; if (keys.has("ArrowLeft") || keys.has("KeyA")) kx--; if (keys.has("ArrowRight") || keys.has("KeyD")) kx++;
+      if (keys.has("ArrowUp") || keys.has("KeyW")) ky--; if (keys.has("ArrowDown") || keys.has("KeyS")) ky++;
+      if (kx || ky) { input.x = kx; input.y = ky; input.active = true; }
+      if (input.active) player.target = Math.atan2(input.y, input.x);
+      player.boosting = input.boost;
+    }
+    // grids
+    segGrid = new Map(); goldGrid = new Map();
+    for (const s of ships) if (s.alive) s.segs.forEach((p, i) => gridAdd(segGrid, p.x, p.y, { s, i, x: p.x, y: p.y }));
+    for (const g of gold) gridAdd(goldGrid, g.x, g.y, g);
+
+    for (const s of ships) {
+      if (!s.alive) continue;
+      if (!s.isPlayer) botThink(s);
+      for (const k in s.buffs) { s.buffs[k].t -= f; if (s.buffs[k].t <= 0) { delete s.buffs[k]; if (k === "ward") s.ward = 0; } }
+      if (s.invuln) s.invuln = Math.max(0, s.invuln - f);
+      if (s.boss && SEASON === "halloween") { s.phase = (s.phase || 0) + f; if (s.phase > 540) { s.phase = 0; s.buffs.ghost = { t: 180, max: 180 }; } }
+      const free = !!s.buffs.oars, boost = (s.boosting && s.len > BASE_LEN) || free;
+      const turn = (TURN - Math.min(.015, s.len / 9000)) * f;
+      s.a += clamp(angDiff(s.a, s.target), -turn, turn);
+      const sp = (boost ? BOOST : SPEED) * (free ? 1.15 : 1) * f;
+      s.x += Math.cos(s.a) * sp; s.y += Math.sin(s.a) * sp;
+      if (s.boosting && !free && s.len > BASE_LEN) { s.drop = (s.drop || 0) + f; if (s.drop >= 22) { s.drop = 0; s.len--; const t = s.segs[s.segs.length - 1]; if (t) addLoot("coin", t.x, t.y, 0); } }
+      s.path.unshift({ x: s.x, y: s.y });
+      buildSegs(s);
+      if (s.x < 10 || s.y < 10 || s.x > W - 10 || s.y > W - 10) { sink(s, null, "edge"); continue; }
+      if (inIsle(s.x, s.y, radius(s) * .4)) { if (s.ward || s.invuln) { s.a += Math.PI; if (s.ward) { s.ward = 0; delete s.buffs.ward; s.invuln = 90; } } else { sink(s, null, "rock"); continue; } }
+      // gold: magnet pulls, then eat
+      const r = radius(s) + 7, pull = s.buffs.magnet ? 190 : 0, mult = s.buffs.mead ? 2 : 1;
+      gridNear(goldGrid, s.x, s.y, Math.max(r, pull), g => {
+        if (g.eaten) return; const dd = d2(g.x, g.y, s.x, s.y);
+        if (pull && dd < pull * pull) { const d = Math.sqrt(dd) || 1; g.x += (s.x - g.x) / d * 3 * f; g.y += (s.y - g.y) / d * 3 * f; }
+        if (dd < r * r) { g.eaten = true; s.score += g.v * mult; while (s.score >= 3) { s.score -= 3; s.len++; }
+          if (TH && s.isPlayer) { s.treats = (s.treats || 0) + 1; if (s.treats === 150) achieve(TH.treatAch); } }
+      });
+      for (let i = powers.length - 1; i >= 0; i--) { const p = powers[i]; if (d2(p.x, p.y, s.x, s.y) < (r + 16) ** 2) { powers.splice(i, 1); grant(s, p.p); } }
+    }
+    gold = gold.filter(g => !g.eaten);
+    for (const g of gold) if (g.glow) g.glow = Math.max(0, g.glow - f);
+    for (const s of ships) if (s.alive && s.len > s.peak) s.peak = s.len;
+    if (player && player.alive && player.len >= 150) achieve("len150");
+    // prow vs shields
+    for (const s of ships) {
+      if (!s.alive || s.buffs.ghost || s.invuln) continue;
+      const rs = radius(s) * .55; let hitBy = null;
+      gridNear(segGrid, s.x, s.y, 60, v => { if (v.s === s || !v.s.alive || v.i === 0 || v.s.buffs.ghost) return;
+        if (d2(s.x, s.y, v.x, v.y) < (radius(v.s) * .78 + rs) ** 2) { hitBy = v.s; return false; } });
+      if (hitBy) sink(s, hitBy, "ship");
+    }
+    if (gold.length < GOLD_TARGET) spawnGold(Math.min(20, GOLD_TARGET - gold.length));
+    for (let i = powers.length - 1; i >= 0; i--) if ((powers[i].life -= f) <= 0) powers.splice(i, 1);
+    if (powers.length < POWER_TARGET && Math.random() < .02 * f) spawnPower();
+    for (const b of bolts) b.t -= f; bolts = bolts.filter(b => b.t > 0);
+    // camera
+    const follow = player && player.alive ? player : (!player ? ships.find(x => x.alive) : null);
+    if (follow) { cam.x += (follow.x - cam.x) * .1; cam.y += (follow.y - cam.y) * .1; }
+    const tz = (player ? clamp(1.1 - player.len / 300, .55, 1.05) : .8) * (SHORTS ? .78 : clamp(vw / 1000, .62, 1));
+    cam.z += (tz - cam.z) * .03;
+  }
+
+  /* ===================== drawing ===================== */
+  const onScreen = (x, y, m) => Math.abs(x - cam.x) < vw / 2 / cam.z + m && Math.abs(y - cam.y) < vh / 2 / cam.z + m;
+  function drawSea() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = ctx.createRadialGradient(vw / 2, vh / 2, 40, vw / 2, vh / 2, Math.max(vw, vh));
+    g.addColorStop(0, TH ? TH.sea[0] : "#14506d"); g.addColorStop(1, TH ? TH.sea[1] : "#082a3d"); ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
+    ctx.translate(vw / 2, vh / 2); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
+    const st = 110, hx = vw / 2 / cam.z, hy = vh / 2 / cam.z;
+    const x0 = Math.floor((cam.x - hx) / st) * st, y0 = Math.floor((cam.y - hy) / st) * st;
+    ctx.strokeStyle = TH ? TH.wave : "rgba(255,255,255,.055)"; ctx.lineWidth = 2;
+    for (let y = y0; y < cam.y + hy + st; y += st) for (let x = x0; x < cam.x + hx + st; x += st) {
+      const o = Math.sin((x * .7 + y) * .012 + tick * .02) * 10, oy = ((x * 13 + y * 7) % 40) - 20;
+      ctx.beginPath(); ctx.moveTo(x + o, y + oy); ctx.quadraticCurveTo(x + 14 + o, y + oy - 6, x + 28 + o, y + oy); ctx.stroke(); }
+    // edge of the world
+    ctx.fillStyle = TH ? TH.edge : "rgba(2,10,18,.55)";
+    ctx.fillRect(-3000, -3000, W + 6000, 3000); ctx.fillRect(-3000, W, W + 6000, 3000); ctx.fillRect(-3000, 0, 3000, W); ctx.fillRect(W, 0, 3000, W);
+    ctx.strokeStyle = TH ? TH.line : "rgba(231,181,74,.35)"; ctx.lineWidth = 10; ctx.setLineDash([40, 26]); ctx.strokeRect(0, 0, W, W); ctx.setLineDash([]);
+  }
+  function drawIsles() {
+    for (const o of isles) { if (!onScreen(o.x, o.y, o.r + 40)) continue;
+      const path = (scale) => { ctx.beginPath(); o.pts.forEach((rr, k) => { const a = k / o.pts.length * Math.PI * 2, x = o.x + Math.cos(a) * rr * scale, y = o.y + Math.sin(a) * rr * scale; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); };
+      const ic = TH ? TH.isle : { shallow: "rgba(160,220,230,.18)", sand: "#c9b27c", grass: "#6b7d4f", rock: "#7a7f86", tree: "#2f4a2e" };
+      ctx.fillStyle = ic.shallow; path(1.18); ctx.fill();          // shallows
+      ctx.fillStyle = ic.sand; path(1.0); ctx.fill();               // sand / snow / dead earth
+      ctx.fillStyle = ic.grass; path(.8); ctx.fill();
+      ctx.fillStyle = ic.rock; path(.38); ctx.fill();
+      o.trees.forEach(([tx, ty], k) => { const x = o.x + tx, y = o.y + ty;
+        if (TH && TH.decor === "pumpkin" && k % 2 === 0) { drawPumpkin(ctx, x, y, 8); return; }
+        if (TH && TH.decor === "pumpkin") { ctx.strokeStyle = ic.tree; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y + 6); ctx.lineTo(x, y - 12); ctx.moveTo(x, y - 4); ctx.lineTo(x - 8, y - 12); ctx.moveTo(x, y - 7); ctx.lineTo(x + 7, y - 14); ctx.stroke(); return; }   // dead tree
+        ctx.fillStyle = ic.tree; ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x - 9, y + 6); ctx.lineTo(x + 9, y + 6); ctx.fill();
+        if (TH && TH.decor === "presents") { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x - 4, y - 6); ctx.lineTo(x + 4, y - 6); ctx.fill();
+          if (k % 3 === 0) { ctx.fillStyle = ["#e74c3c", "#27ae60", "#f1c40f"][k % 3 === 0 ? (k / 3) % 3 : 0]; ctx.fillRect(x + 7, y + 2, 7, 6); ctx.fillStyle = "#fff"; ctx.fillRect(x + 10, y + 2, 1.4, 6); } }
+      });
+    }
+  }
+  function drawPumpkin(c, x, y, r) {
+    c.fillStyle = "#e8701a"; c.beginPath(); c.ellipse(x, y, r * 1.15, r, 0, 0, 7); c.fill();
+    c.strokeStyle = "#b9500f"; c.lineWidth = 1; c.beginPath(); c.ellipse(x, y, r * .45, r, 0, 0, 7); c.stroke();
+    c.fillStyle = "#3b5e1f"; c.fillRect(x - 1, y - r - 3, 2.4, 4);
+    const fl = .7 + .3 * Math.sin(tick * .2 + x);
+    c.fillStyle = `rgba(255,230,120,${fl})`; c.beginPath(); c.moveTo(x - r * .55, y - r * .25); c.lineTo(x - r * .2, y - r * .25); c.lineTo(x - r * .37, y - r * .55); c.fill();
+    c.beginPath(); c.moveTo(x + r * .55, y - r * .25); c.lineTo(x + r * .2, y - r * .25); c.lineTo(x + r * .37, y - r * .55); c.fill();
+    c.fillRect(x - r * .5, y + r * .2, r, r * .22);
+  }
+  function drawSeasonLoot(c, g, x, y, sc) {
+    if (!TH) return false;
+    const T = g.type;
+    if (SEASON === "halloween") switch (T) {
+      case "coin": { const r = 3.3 * sc; c.fillStyle = "#fff6e0"; c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * .75, y + r * .8); c.lineTo(x - r * .75, y + r * .8); c.fill();   // candy corn
+        c.fillStyle = "#ff8a1c"; c.beginPath(); c.moveTo(x - r * .48, y + r * .1); c.lineTo(x + r * .48, y + r * .1); c.lineTo(x + r * .75, y + r * .8); c.lineTo(x - r * .75, y + r * .8); c.fill();
+        c.fillStyle = "#ffd21c"; c.fillRect(x - r * .75, y + r * .45, r * 1.5, r * .35); return true; }
+      case "silver": { const r = 3 * sc; c.fillStyle = "#8e44ad"; c.beginPath(); c.ellipse(x, y, r, r * .7, 0, 0, 7); c.fill();   // wrapped candy
+        c.beginPath(); c.moveTo(x - r, y); c.lineTo(x - r * 1.8, y - r * .6); c.lineTo(x - r * 1.8, y + r * .6); c.fill(); c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + r * 1.8, y - r * .6); c.lineTo(x + r * 1.8, y + r * .6); c.fill();
+        c.fillStyle = "#d2b4de"; c.fillRect(x - r * .2, y - r * .7, r * .4, r * 1.4); return true; }
+      case "amber": { const r = 3.4 * sc; c.fillStyle = "#f4f6f7"; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();   // eyeball
+        c.fillStyle = "#27ae60"; c.beginPath(); c.arc(x + r * .2, y, r * .5, 0, 7); c.fill(); c.fillStyle = "#111"; c.beginPath(); c.arc(x + r * .25, y, r * .24, 0, 7); c.fill(); return true; }
+      case "gem": { const r = 4.2 * sc, fl = Math.sin(tick * .15 + g.t) * 1.2;   // soul wisp
+        c.fillStyle = "#9dffe0"; c.beginPath(); c.moveTo(x, y - r * 1.4 - fl); c.quadraticCurveTo(x + r, y, x, y + r * .8); c.quadraticCurveTo(x - r, y, x, y - r * 1.4 - fl); c.fill(); return true; }
+      case "goblet": { const r = 4.6 * sc; c.fillStyle = "#1c1c1c"; c.beginPath(); c.arc(x, y + r * .15, r * .85, 0, Math.PI); c.fill(); c.fillRect(x - r * .85, y - r * .2, r * 1.7, r * .4);   // cauldron
+        c.fillStyle = "#58d68d"; c.beginPath(); c.ellipse(x, y - r * .2, r * .8, r * .25, 0, 0, 7); c.fill();
+        c.fillStyle = "#a9f5c6"; c.beginPath(); c.arc(x - r * .25, y - r * .55 - Math.abs(Math.sin(tick * .1 + g.t)) * 2, r * .18, 0, 7); c.fill(); return true; }
+      case "horn": { const r = 5 * sc; c.strokeStyle = "#f2efe6"; c.lineWidth = 2.2 * sc; c.lineCap = "round"; c.beginPath(); c.moveTo(x - r, y); c.lineTo(x + r, y); c.stroke();   // bone
+        c.fillStyle = "#f2efe6"; for (const sx of [-1, 1]) { c.beginPath(); c.arc(x + sx * r, y - 1.6 * sc, 1.6 * sc, 0, 7); c.arc(x + sx * r, y + 1.6 * sc, 1.6 * sc, 0, 7); c.fill(); } return true; }
+      case "chest": { const r = 7 * sc; // coffin
+        c.fillStyle = "#3e2723"; c.beginPath(); c.moveTo(x - r * .5, y - r * 1.2); c.lineTo(x + r * .5, y - r * 1.2); c.lineTo(x + r * .8, y - r * .4); c.lineTo(x + r * .45, y + r * 1.2); c.lineTo(x - r * .45, y + r * 1.2); c.lineTo(x - r * .8, y - r * .4); c.closePath(); c.fill();
+        c.fillStyle = "#d4ac0d"; c.fillRect(x - r * .08, y - r * .8, r * .16, r * 1.1); c.fillRect(x - r * .35, y - r * .5, r * .7, r * .15); return true; }
+    }
+    if (SEASON === "christmas") switch (T) {
+      case "coin": { const r = 3.1 * sc; c.fillStyle = "#fff"; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();   // peppermint
+        c.fillStyle = "#e74c3c"; for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(x, y); c.arc(x, y, r, k * 1.57 + tick * .02, k * 1.57 + .7 + tick * .02); c.fill(); } return true; }
+      case "silver": { const r = 3.6 * sc; c.strokeStyle = "#eaf7ff"; c.lineWidth = 1.2 * sc; c.beginPath();   // snowflake
+        for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; c.moveTo(x - Math.cos(a) * r, y - Math.sin(a) * r); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } c.stroke(); return true; }
+      case "amber": { const r = 3.6 * sc; c.fillStyle = "#b9773d"; c.beginPath(); c.arc(x, y - r * .6, r * .45, 0, 7); c.fill();   // gingerbread man
+        c.beginPath(); c.ellipse(x, y + r * .25, r * .5, r * .65, 0, 0, 7); c.fill(); c.fillRect(x - r * .95, y - r * .05, r * 1.9, r * .3);
+        c.fillStyle = "#fff"; c.fillRect(x - r * .1, y + r * .05, r * .2, r * .2); return true; }
+      case "gem": { const r = 3.8 * sc; c.fillStyle = `hsl(${g.h},75%,52%)`; c.beginPath(); c.arc(x, y + r * .2, r, 0, 7); c.fill();   // ornament
+        c.fillStyle = "#d4ac0d"; c.fillRect(x - r * .3, y - r * 1.05, r * .6, r * .4); c.fillStyle = "rgba(255,255,255,.7)"; c.beginPath(); c.arc(x - r * .35, y - r * .1, r * .25, 0, 7); c.fill(); return true; }
+      case "goblet": { const r = 4.4 * sc; c.fillStyle = "#c0392b"; c.fillRect(x - r * .6, y - r * .6, r * 1.2, r * 1.3);   // cocoa mug
+        c.strokeStyle = "#c0392b"; c.lineWidth = 1.4 * sc; c.beginPath(); c.arc(x + r * .75, y, r * .35, -1.4, 1.4); c.stroke();
+        c.fillStyle = "#6e4b2a"; c.fillRect(x - r * .5, y - r * .55, r, r * .25); c.fillStyle = "#fff"; c.beginPath(); c.arc(x - r * .15, y - r * .65, r * .2, 0, 7); c.arc(x + r * .2, y - r * .7, r * .18, 0, 7); c.fill(); return true; }
+      case "horn": { const r = 5 * sc; c.lineCap = "round"; c.lineWidth = 2.4 * sc; c.strokeStyle = "#fff"; c.beginPath(); c.moveTo(x, y + r); c.lineTo(x, y - r * .3); c.arc(x - r * .4, y - r * .3, r * .4, 0, Math.PI, true); c.stroke();   // candy cane
+        c.strokeStyle = "#e74c3c"; c.setLineDash([2 * sc, 2 * sc]); c.stroke(); c.setLineDash([]); return true; }
+      case "chest": { const r = 7 * sc, col = ["#c0392b", "#27ae60", "#2e86c1", "#8e44ad"][Math.floor(g.t) % 4];   // present
+        c.fillStyle = col; c.fillRect(x - r, y - r * .8, r * 2, r * 1.7); c.fillStyle = "#f4d03f"; c.fillRect(x - r * .15, y - r * .8, r * .3, r * 1.7); c.fillRect(x - r, y - r * .1, r * 2, r * .3);
+        c.beginPath(); c.ellipse(x - r * .35, y - r * .95, r * .35, r * .2, -.4, 0, 7); c.ellipse(x + r * .35, y - r * .95, r * .35, r * .2, .4, 0, 7); c.fill(); return true; }
+    }
+    return false;
+  }
+  function drawLootItem(c, g, x, y, sc) {
+    const tw = Math.sin(tick * .05 + g.t);
+    if (drawSeasonLoot(c, g, x, y, sc)) return;
+    switch (g.type) {
+      case "coin": { const r = 2.8 * sc;
+        c.fillStyle = "#8a5a12"; c.beginPath(); c.ellipse(x, y + .8, r, r * .8, 0, 0, 7); c.fill();
+        c.fillStyle = "#e9b949"; c.beginPath(); c.ellipse(x, y, r, r * .8, 0, 0, 7); c.fill();
+        c.fillStyle = "#c48d22"; c.beginPath(); c.ellipse(x, y, r * .62, r * .48, 0, 0, 7); c.fill();
+        c.fillStyle = "#f6dc8a"; c.beginPath(); c.ellipse(x, y, r * .5, r * .38, 0, 0, 7); c.fill(); break; }
+      case "silver": { const r = 3.2 * sc;   // hacksilver arm-ring
+        c.strokeStyle = "#7f8c8d"; c.lineWidth = 2.2 * sc; c.beginPath(); c.ellipse(x, y + .6, r, r * .7, 0, 0, 7); c.stroke();
+        c.strokeStyle = "#e5e8e8"; c.lineWidth = 1.4 * sc; c.beginPath(); c.ellipse(x, y, r, r * .7, 0, 0, 7); c.stroke(); break; }
+      case "amber": { const r = 3.4 * sc;
+        c.fillStyle = "rgba(230,126,34,.9)"; c.beginPath(); c.moveTo(x, y - r * 1.2); c.quadraticCurveTo(x + r, y, x, y + r); c.quadraticCurveTo(x - r, y, x, y - r * 1.2); c.fill();
+        c.fillStyle = "rgba(255,220,150,.8)"; c.beginPath(); c.arc(x - r * .25, y - r * .2, r * .3, 0, 7); c.fill(); break; }
+      case "gem": { const r = 4 * sc;
+        c.fillStyle = `hsl(${g.h},75%,45%)`; c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * .8, y); c.lineTo(x, y + r); c.lineTo(x - r * .8, y); c.closePath(); c.fill();
+        c.fillStyle = `hsl(${g.h},85%,72%)`; c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * .8, y); c.lineTo(x, y); c.closePath(); c.fill(); break; }
+      case "goblet": { const r = 4.5 * sc;
+        c.fillStyle = "#b7950b"; c.fillRect(x - r * .15, y, r * .3, r * .8); c.fillRect(x - r * .5, y + r * .7, r, r * .25);
+        c.fillStyle = "#f4d03f"; c.beginPath(); c.moveTo(x - r * .7, y - r * .8); c.lineTo(x + r * .7, y - r * .8); c.quadraticCurveTo(x + r * .6, y + r * .2, x, y + r * .2); c.quadraticCurveTo(x - r * .6, y + r * .2, x - r * .7, y - r * .8); c.fill(); break; }
+      case "horn": { const r = 5 * sc;   // drinking horn
+        c.strokeStyle = "#f0e6d2"; c.lineWidth = 2.6 * sc; c.lineCap = "round"; c.beginPath(); c.moveTo(x - r, y + r * .3); c.quadraticCurveTo(x, y - r, x + r, y - r * .2); c.stroke();
+        c.strokeStyle = "#d4ac0d"; c.lineWidth = 1.2 * sc; c.beginPath(); c.arc(x + r * .85, y - r * .25, r * .3, 0, 7); c.stroke(); break; }
+      case "chest": { const r = 7 * sc;
+        c.fillStyle = "#6e4b2a"; c.fillRect(x - r, y - r * .5, r * 2, r * 1.2);
+        c.fillStyle = "#8b5e34"; c.beginPath(); c.moveTo(x - r, y - r * .5); c.quadraticCurveTo(x, y - r * 1.3, x + r, y - r * .5); c.fill();
+        c.fillStyle = "#f4d03f"; c.fillRect(x - r, y - r * .15, r * 2, r * .2); c.fillRect(x - r * .15, y - r * .3, r * .3, r * .5); break; }
+    }
+    if (tw > .93 && g.type !== "silver") { c.fillStyle = "#fffbe6"; c.fillRect(x - 2 * sc, y - 2 * sc, 1.4, 1.4); }
+  }
+  function drawGold() { for (const g of gold) if (onScreen(g.x, g.y, 20)) drawLootItem(ctx, g, g.x, g.y, 1.4); }
+  function drawPowers() {
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const p of powers) { if (!onScreen(p.x, p.y, 40)) continue;
+      const bob = Math.sin(tick * .05 + p.t) * 3, c = RCOL[p.p.r], fade = p.life < 300 ? (Math.sin(tick * .3) > 0 ? 1 : .35) : 1;
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = c + "33"; ctx.beginPath(); ctx.arc(p.x, p.y + bob, 22 + Math.sin(tick * .08 + p.t) * 3, 0, 7); ctx.fill();
+      ctx.fillStyle = "#4b5056"; ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 15 + bob, 26, 30, 8); ctx.fill();   // runestone
+      ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.font = "16px system-ui"; ctx.fillText(p.p.icon, p.x, p.y + bob + 1);
+      ctx.globalAlpha = 1; }
+  }
+  function drawShip(s) {
+    if (!s.alive || !onScreen(s.x, s.y, 900)) return;
+    const r = radius(s), segs = s.segs, ghost = s.buffs.ghost, rogue = s.kind === "rogue";
+    ctx.globalAlpha = ghost ? .45 : 1;
+    // wake behind the stern
+    const t = segs[segs.length - 1]; ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.beginPath(); ctx.arc(t.x, t.y, r * 1.3, 0, 7); ctx.fill();
+    // hull
+    ctx.strokeStyle = "#4a2f17"; ctx.lineWidth = r * 1.7; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y); for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y); ctx.stroke();
+    ctx.strokeStyle = "#6b4423"; ctx.lineWidth = r * 1.25; ctx.stroke();
+    // oars sweeping on both sides
+    ctx.strokeStyle = "#c8a46a"; ctx.lineWidth = 1.6;
+    for (let i = 2; i < segs.length - 1; i += 2) { const p = segs[i], q = segs[i - 1], a = Math.atan2(q.y - p.y, q.x - p.x), sw = Math.sin(tick * (s.boosting ? .3 : .15) + i) * .5;
+      for (const side of [1, -1]) { const oa = a + side * (Math.PI / 2 + sw * side); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(oa) * r * 1.6, p.y + Math.sin(oa) * r * 1.6); ctx.stroke(); } }
+    // shields
+    for (let i = segs.length - 1; i >= 1; i--) { const p = segs[i], q = segs[i - 1]; drawShield(ctx, s.skin, p.x, p.y, r * .74, i, Math.atan2(q.y - p.y, q.x - p.x)); }
+    // prow + sail
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a);
+    ctx.fillStyle = "#5a3a1c"; ctx.beginPath(); ctx.moveTo(r * 2.1, 0); ctx.quadraticCurveTo(r * .7, -r * 1.15, -r * .7, -r * .85);
+    ctx.lineTo(-r * .7, r * .85); ctx.quadraticCurveTo(r * .7, r * 1.15, r * 2.1, 0); ctx.fill();
+    drawFig(ctx, s.fig, r, rogue);
+    ctx.fillStyle = s.skin.sail[0]; ctx.fillRect(-r * .2, -r * 1.35, r * .55, r * 2.7);                                // sail
+    ctx.fillStyle = s.skin.sail[1]; for (let k = -1; k <= 1; k++) ctx.fillRect(-r * .2, k * r * .9 - r * .2, r * .55, r * .4);
+    ctx.restore();
+    // ward glow
+    if (s.ward || s.invuln) { ctx.strokeStyle = "rgba(120,190,255,.7)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x, s.y, r * 2.3, 0, 7); ctx.stroke(); }
+    if (s.buffs.magnet) { ctx.strokeStyle = "rgba(231,181,74,.18)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.x, s.y, 190, 0, 7); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = s.isPlayer ? "#e7b54a" : rogue ? "#ff8a7a" : "rgba(255,255,255,.85)";
+    ctx.font = `700 ${Math.max(11, r * .85)}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(s.name, s.x, s.y - r * 2.2);
+  }
+  function drawShield(c, sk, x, y, rad, i, ang) {
+    const alt = i % 2, base = sk.pat === "rainbow" ? `hsl(${(i * 24 + tick * 2) % 360},70%,55%)` : alt ? sk.a : sk.b, other = alt ? sk.b : sk.a;
+    if (sk.glow) { c.fillStyle = sk.glow + "33"; c.beginPath(); c.arc(x, y, rad * 1.35, 0, 7); c.fill(); }
+    if (sk.ghostly) c.globalAlpha *= .7;
+    c.fillStyle = base; c.beginPath(); c.arc(x, y, rad, 0, 7); c.fill();
+    c.save(); c.beginPath(); c.arc(x, y, rad, 0, 7); c.clip();
+    c.strokeStyle = other; c.fillStyle = other; c.lineWidth = rad * .28;
+    switch (sk.pat) {
+      case "cross": c.beginPath(); c.moveTo(x - rad, y); c.lineTo(x + rad, y); c.moveTo(x, y - rad); c.lineTo(x, y + rad); c.stroke(); break;
+      case "split": c.beginPath(); c.moveTo(x, y); c.arc(x, y, rad, ang, ang + Math.PI); c.fill(); break;
+      case "rings": c.lineWidth = rad * .16; c.beginPath(); c.arc(x, y, rad * .62, 0, 7); c.stroke(); break;
+      case "spiral": c.lineWidth = rad * .18; c.beginPath(); for (let k = 0; k < 16; k++) { const a = k * .7 + i, rr = rad * k / 16; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.stroke(); break;
+      case "bolt": c.lineWidth = rad * .2; c.beginPath(); c.moveTo(x - rad * .3, y - rad); c.lineTo(x + rad * .1, y - rad * .1); c.lineTo(x - rad * .15, y + rad * .05); c.lineTo(x + rad * .3, y + rad); c.stroke(); break;
+      case "skull": c.fillStyle = other; c.beginPath(); c.arc(x, y - rad * .1, rad * .5, 0, 7); c.fill(); c.fillRect(x - rad * .28, y + rad * .25, rad * .56, rad * .3);
+        c.fillStyle = base; c.beginPath(); c.arc(x - rad * .2, y - rad * .15, rad * .14, 0, 7); c.arc(x + rad * .2, y - rad * .15, rad * .14, 0, 7); c.fill(); break;
+      case "jack": c.fillStyle = `rgba(40,20,0,.9)`; c.beginPath(); c.moveTo(x - rad * .55, y - rad * .05); c.lineTo(x - rad * .15, y - rad * .05); c.lineTo(x - rad * .35, y - rad * .45); c.fill();
+        c.beginPath(); c.moveTo(x + rad * .55, y - rad * .05); c.lineTo(x + rad * .15, y - rad * .05); c.lineTo(x + rad * .35, y - rad * .45); c.fill(); c.fillRect(x - rad * .5, y + rad * .2, rad, rad * .22); break;
+      case "stripe": c.lineWidth = rad * .3; c.beginPath(); for (let k = -2; k <= 2; k++) { c.moveTo(x - rad + k * rad * .6, y + rad); c.lineTo(x + rad + k * rad * .6, y - rad); } c.stroke(); break;
+      case "snowflake": c.lineWidth = rad * .14; c.strokeStyle = "#5dade2"; c.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; c.moveTo(x - Math.cos(a) * rad * .7, y - Math.sin(a) * rad * .7); c.lineTo(x + Math.cos(a) * rad * .7, y + Math.sin(a) * rad * .7); } c.stroke(); break;
+      case "icing": c.strokeStyle = "#fff8ec"; c.lineWidth = rad * .14; c.beginPath(); for (let k = 0; k <= 24; k++) { const a = k / 24 * Math.PI * 2, rr = rad * (.68 + .08 * Math.sin(k * 3)); k ? c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : c.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.stroke(); break;
+      case "flame": c.fillStyle = `rgba(245,176,65,${.5 + .4 * Math.sin(tick * .2 + i)})`; c.beginPath(); c.arc(x, y + rad * .2, rad * .55, 0, 7); c.fill(); break;
+    }
+    c.restore();
+    c.strokeStyle = "#2b1a0b"; c.lineWidth = Math.max(1.2, rad * .12); c.beginPath(); c.arc(x, y, rad, 0, 7); c.stroke();
+    c.fillStyle = "#b8bcc2"; c.beginPath(); c.arc(x, y, rad * .26, 0, 7); c.fill();
+  }
+  function drawFig(c, fig, r, rogue) {   // drawn in prow space: +x is forward
+    const hx = r * 2.0, eye = rogue ? "#ff5544" : "#fff";
+    c.save(); c.translate(hx, 0);
+    switch (fig) {
+      case "wolf": c.fillStyle = "#7f8c8d"; c.beginPath(); c.moveTo(r * .7, 0); c.lineTo(-r * .3, -r * .4); c.lineTo(-r * .3, r * .4); c.fill();
+        c.beginPath(); c.moveTo(-r * .2, -r * .35); c.lineTo(-r * .45, -r * .7); c.lineTo(0, -r * .4); c.moveTo(-r * .2, r * .35); c.lineTo(-r * .45, r * .7); c.lineTo(0, r * .4); c.fill(); break;
+      case "serpent": c.strokeStyle = "#148f77"; c.lineWidth = r * .32; c.lineCap = "round"; c.beginPath(); c.moveTo(-r * .4, 0); c.quadraticCurveTo(0, -r * .5, r * .3, 0); c.quadraticCurveTo(r * .5, r * .3, r * .7, 0); c.stroke(); break;
+      case "ravenh": c.fillStyle = "#17202a"; c.beginPath(); c.arc(0, 0, r * .38, 0, 7); c.fill(); c.fillStyle = "#d4ac0d"; c.beginPath(); c.moveTo(r * .3, -r * .12); c.lineTo(r * .8, 0); c.lineTo(r * .3, r * .12); c.fill(); break;
+      case "jack": drawPumpkin(c, 0, 0, r * .42); break;
+      case "bat": c.fillStyle = "#1b1b1b"; c.beginPath(); c.arc(0, 0, r * .3, 0, 7); c.fill(); { const fl = Math.sin(tick * .3) * r * .2;
+        c.beginPath(); c.moveTo(-r * .1, 0); c.quadraticCurveTo(-r * .3, -r * .9 - fl, r * .2, -r * .8 - fl); c.lineTo(r * .05, -r * .2); c.fill(); c.beginPath(); c.moveTo(-r * .1, 0); c.quadraticCurveTo(-r * .3, r * .9 + fl, r * .2, r * .8 + fl); c.lineTo(r * .05, r * .2); c.fill(); } break;
+      case "reindeer": c.strokeStyle = "#7b5537"; c.lineWidth = r * .1; c.beginPath(); c.moveTo(-r * .1, -r * .25); c.lineTo(-r * .55, -r * .6); c.lineTo(-r * .45, -r * .85); c.moveTo(-r * .4, -r * .48); c.lineTo(-r * .25, -r * .75);
+        c.moveTo(-r * .1, r * .25); c.lineTo(-r * .55, r * .6); c.lineTo(-r * .45, r * .85); c.moveTo(-r * .4, r * .48); c.lineTo(-r * .25, r * .75); c.stroke();
+        c.fillStyle = "#8d6e4c"; c.beginPath(); c.ellipse(0, 0, r * .45, r * .33, 0, 0, 7); c.fill(); c.fillStyle = "#e74c3c"; c.beginPath(); c.arc(r * .45, 0, r * .12, 0, 7); c.fill(); break;
+      case "snowman": c.fillStyle = "#fdfefe"; c.beginPath(); c.arc(-r * .15, 0, r * .4, 0, 7); c.fill(); c.beginPath(); c.arc(r * .3, 0, r * .28, 0, 7); c.fill();
+        c.fillStyle = "#e67e22"; c.beginPath(); c.moveTo(r * .52, -r * .05); c.lineTo(r * .8, 0); c.lineTo(r * .52, r * .05); c.fill(); c.fillStyle = "#1b1b1b"; c.fillRect(r * .15, -r * .3, r * .3, r * .6); break;
+      case "bear": c.fillStyle = "#6e2c00"; c.beginPath(); c.arc(0, 0, r * .45, 0, 7); c.fill(); c.beginPath(); c.arc(-r * .2, -r * .4, r * .18, 0, 7); c.arc(-r * .2, r * .4, r * .18, 0, 7); c.fill();
+        c.fillStyle = "#a04000"; c.beginPath(); c.arc(r * .3, 0, r * .18, 0, 7); c.fill(); break;
+      case "skull": c.fillStyle = "#ecf0f1"; c.beginPath(); c.arc(0, 0, r * .42, 0, 7); c.fill(); c.fillStyle = "#1b1b1b"; c.beginPath(); c.arc(r * .1, -r * .15, r * .1, 0, 7); c.arc(r * .1, r * .15, r * .1, 0, 7); c.fill(); break;
+      default: c.fillStyle = rogue ? "#7b241c" : "#a0703a"; c.beginPath(); c.arc(0, 0, r * .42, 0, 7); c.fill();       // dragon
+        c.strokeStyle = c.fillStyle; c.lineWidth = r * .1; c.beginPath(); c.moveTo(-r * .2, -r * .3); c.lineTo(-r * .55, -r * .55); c.moveTo(-r * .2, r * .3); c.lineTo(-r * .55, r * .55); c.stroke();
+    }
+    if (!["skull", "serpent", "jack", "snowman", "bat"].includes(fig)) { c.fillStyle = eye; c.beginPath(); c.arc(r * .12, -r * .16, r * .1, 0, 7); c.fill(); }
+    c.restore();
+  }
+  function drawBolts() { for (const b of bolts) { ctx.strokeStyle = `rgba(200,230,255,${b.t / 30})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
+    for (let k = 1; k < 8; k++) ctx.lineTo(b.x1 + (b.x2 - b.x1) * k / 8 + rnd(-25, 25), b.y1 + (b.y2 - b.y1) * k / 8 + rnd(-25, 25)); ctx.lineTo(b.x2, b.y2); ctx.stroke(); } }
+  let hudT = 0;
+  function drawHud() {
+    if ((hudT += 1) % 6) return;
+    const esc = t => t.replace(/[<&]/g, "");
+    if (player) $("hud").innerHTML = `Shield wall <b>${player.len}</b><br>Sunk ${player.kills}` +
+      `<div class="buffs">${Object.entries(player.buffs).map(([k, v]) => { const p = POWERS.find(q => q.id === k); return `<div class="buff"><i>${p.icon}</i>${p.name}<span class="bar"><span style="width:${100 * v.t / v.max}%"></span></span></div>`; }).join("")}</div>`;
+    const top = ships.filter(s => s.alive).sort((a, b) => b.len - a.len).slice(0, 6);
+    if (player && player.alive && top[0] === player && player.len > 30) achieve("top1");
+    $("board").innerHTML = `<h4>Mightiest raiders</h4>` + top.map((s, i) => `<div class="${s.isPlayer ? "me" : s.kind === "rogue" ? "rogue" : ""}">${i + 1}. ${esc(s.name)} · ${s.len}</div>`).join("") +
+      (player && player.alive && !top.includes(player) ? `<div class="me">… ${esc(player.name)} · ${player.len}</div>` : "");
+    mctx.clearRect(0, 0, 240, 240); mctx.save(); mctx.beginPath(); mctx.arc(120, 120, 118, 0, 7); mctx.clip();
+    const k = 240 / W;
+    mctx.fillStyle = "#c9b27c99"; for (const o of isles) { mctx.beginPath(); mctx.arc(o.x * k, o.y * k, Math.max(2, o.r * k), 0, 7); mctx.fill(); }
+    for (const s of ships) { if (!s.alive) continue; mctx.fillStyle = s.isPlayer ? "#e7b54a" : s.kind === "rogue" ? "#ff6655" : "rgba(255,255,255,.55)";
+      mctx.beginPath(); mctx.arc(s.x * k, s.y * k, s.isPlayer ? 6 : 2.5 + Math.min(4, s.len / 35), 0, 7); mctx.fill(); }
+    mctx.restore();
+  }
+  // seasonal sky: bats or snow, drawn over the world in screen space
+  const sky = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: rnd(.5, 1.4), p: Math.random() * 6 }));
+  const fogs = Array.from({ length: 6 }, () => ({ x: Math.random(), y: Math.random(), r: rnd(.25, .5), v: rnd(.0002, .0006) }));
+  let fogSprite = null, vigSprite = null;
+  function drawSky() {
+    if (!TH) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (TH.fog) {   // fog puffs + vignette are pre-drawn once into small sprites, then stretched (much cheaper than gradients every frame)
+      if (!fogSprite) { fogSprite = document.createElement("canvas"); fogSprite.width = fogSprite.height = 128; const fc = fogSprite.getContext("2d"), g = fc.createRadialGradient(64, 64, 0, 64, 64, 64);
+        g.addColorStop(0, "rgba(170,150,200,.10)"); g.addColorStop(1, "rgba(170,150,200,0)"); fc.fillStyle = g; fc.fillRect(0, 0, 128, 128); }
+      if (!vigSprite || vigSprite.w !== vw || vigSprite.h !== vh) { vigSprite = document.createElement("canvas"); vigSprite.width = 256; vigSprite.height = 256; vigSprite.w = vw; vigSprite.h = vh;
+        const vc = vigSprite.getContext("2d"), v = vc.createRadialGradient(128, 128, 128 * .42, 128, 128, 128 * 1.06); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(10,0,20,.45)"); vc.fillStyle = v; vc.fillRect(0, 0, 256, 256); }
+      for (const f of fogs) { f.x = (f.x + f.v) % 1.3; const x = (f.x - .15) * vw, y = f.y * vh, R = f.r * Math.max(vw, vh); ctx.drawImage(fogSprite, x - R, y - R, R * 2, R * 2); }
+      ctx.drawImage(vigSprite, 0, 0, vw, vh); }
+    if (TH.sky === "bats") { ctx.fillStyle = "rgba(15,5,20,.85)";
+      for (let i = 0; i < 14; i++) { const b = sky[i]; b.x = (b.x + .0009 * b.s) % 1.1; const x = (b.x - .05) * vw, y = (b.y * .8 + Math.sin(tick * .02 + b.p) * .03) * vh, w = 9 * b.s, fl = Math.sin(tick * .35 + b.p) * w * .6;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - w * .6, y - w * .5 - fl, x - w * 1.3, y - fl * .5); ctx.quadraticCurveTo(x - w * .6, y - w * .1, x, y + w * .2);
+        ctx.quadraticCurveTo(x + w * .6, y - w * .1, x + w * 1.3, y - fl * .5); ctx.quadraticCurveTo(x + w * .6, y - w * .5 - fl, x, y); ctx.fill(); } }
+    if (TH.sky === "snow") { ctx.fillStyle = "rgba(255,255,255,.85)";
+      for (const f of sky) { f.y = (f.y + .0012 * f.s) % 1.02; const x = ((f.x + Math.sin(tick * .01 + f.p) * .02) % 1) * vw, y = f.y * vh;
+        ctx.beginPath(); ctx.arc(x, y, 1.4 * f.s, 0, 7); ctx.fill(); } }
+  }
+  function drawShortsOverlay() {
+    if (!SHORTS) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const acc = SEASON === "halloween" ? "#ff8c1a" : SEASON === "christmas" ? "#ff6b6b" : "#e7b54a";
+    const g = ctx.createLinearGradient(0, 0, 0, 150); g.addColorStop(0, "rgba(0,0,0,.6)"); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(0, 0, vw, 150);
+    ctx.font = "900 44px system-ui"; ctx.fillStyle = "#f3ead6"; ctx.shadowColor = "#000"; ctx.shadowBlur = 12;
+    const t1 = "LONG", t2 = "SHIP", t3 = ".io", w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width, w3 = ctx.measureText(t3).width, x0 = vw / 2 - (w1 + w2 + w3) / 2;
+    ctx.textAlign = "left"; ctx.fillText(t1, x0, 62); ctx.fillStyle = "#e7b54a"; ctx.fillText(t2, x0 + w1, 62); ctx.fillStyle = "#f3ead6"; ctx.fillText(t3, x0 + w1 + w2, 62);
+    ctx.textAlign = "center";
+    if (TH) { ctx.font = "800 19px system-ui"; ctx.fillStyle = acc; ctx.fillText(TH.tag, vw / 2, 92); }
+    if (player) { ctx.font = "800 22px system-ui"; ctx.fillStyle = "#fff"; ctx.fillText(`Shield wall ${player.len}` + (player.kills ? `  ·  ⚔️ ${player.kills}` : ""), vw / 2, TH ? 124 : 100); }
+    if (canvasToast && canvasToast.t > 0) { canvasToast.t--; ctx.globalAlpha = Math.min(1, canvasToast.t / 20); ctx.font = "900 30px system-ui"; ctx.fillStyle = "#fff"; ctx.fillText(canvasToast.a, vw / 2, vh * .32);
+      if (canvasToast.b) { ctx.font = "700 18px system-ui"; ctx.fillText(canvasToast.b, vw / 2, vh * .32 + 28); } ctx.globalAlpha = 1; }
+    if (player && !player.alive) { ctx.font = "900 64px system-ui"; ctx.fillStyle = "#fff"; ctx.fillText("SUNK!", vw / 2, vh * .45); ctx.font = "800 24px system-ui"; ctx.fillText(`Shield wall: ${player.peak || player.len}`, vw / 2, vh * .45 + 40); }
+    const bh = 120, gb = ctx.createLinearGradient(0, vh - bh, 0, vh); gb.addColorStop(0, "rgba(0,0,0,0)"); gb.addColorStop(1, "rgba(0,0,0,.65)"); ctx.fillStyle = gb; ctx.fillRect(0, vh - bh, vw, bh);
+    ctx.shadowBlur = 0; ctx.font = "800 20px system-ui"; const cta = "Play free · busterrdust.com/games";
+    ctx.fillStyle = acc; const pw = ctx.measureText(cta).width + 52, ph = 48, px = vw / 2 - pw / 2, py = vh - 80; ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 24); ctx.fill();
+    ctx.fillStyle = "#1b1206"; ctx.fillText(cta, vw / 2, py + 31);
+    ctx.shadowBlur = 0;
+  }
+  // built-in clip recorder (Shorts mode only): records the 1080x1920 canvas straight to a video file
+  let rec = null, recChunks = [], recStart = 0;
+  function recPick() { for (const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; return ""; }
+  function recToggle() {
+    const btn = $("recBtn");
+    if (rec) { rec.stop(); return; }
+    const mime = recPick(); if (!mime) { toast("Recording isn't supported in this browser", "Try Chrome or Edge"); return; }
+    recChunks = []; rec = new MediaRecorder(cv.captureStream(60), { mimeType: mime, videoBitsPerSecond: 10e6 });
+    rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => { const blob = new Blob(recChunks, { type: mime }), a = document.createElement("a"), ext = mime.includes("mp4") ? "mp4" : "webm";
+      a.href = URL.createObjectURL(blob); a.download = `longship-${SEASON || "classic"}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.${ext}`; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); rec = null; btn.classList.remove("on"); btn.textContent = "● REC"; };
+    rec.start(500); recStart = performance.now(); btn.classList.add("on");
+  }
+  setInterval(() => { if (!rec) return; const s = Math.floor((performance.now() - recStart) / 1000); $("recBtn").textContent = `■ STOP ${s}s`; if (s >= 59) rec.stop(); }, 250);
+  $("recBtn").onclick = recToggle;
+  addEventListener("keydown", e => { if (e.shiftKey && e.code === "KeyR" && SHORTS) recToggle(); });
+
+  let last = performance.now();
+  function frame(now) {
+    const f = clamp((now - last) / (1000 / 60), 0, 3); last = now;
+    step(f); drawSea(); drawIsles(); drawGold(); drawPowers();
+    for (const s of ships) if (!s.isPlayer) drawShip(s); if (player) drawShip(player); drawBolts();
+    drawSky(); drawShortsOverlay(); drawHud(); requestAnimationFrame(frame);
+  }
+
+  // ships sail behind the title screen
+  setupWorld(); player = null;
+  $("name").value = store.get("ls_name") || "";
+  if (TH) $("seasonTag").innerHTML = `${TH.tag}<small>${TH.sub}</small>`;
+  const best = +store.get("ls_best") || 0; if (best) $("bestLine").innerHTML = `Your best shield wall: <span class="best">${best}</span>`;
+  $("go").onclick = start; $("again").onclick = start;
+  function showPlunder() { document.querySelectorAll("[data-plunder]").forEach(e => e.textContent = prof.plunder.toLocaleString()); }
+  let wtab = "ships";
+  function preview(cnv, sk, fig) {
+    const c = cnv.getContext("2d"), w = cnv.width, h = cnv.height; c.clearRect(0, 0, w, h);
+    const r = 17, pts = []; for (let i = 0; i < 9; i++) pts.push({ x: w * .8 - i * 21, y: h / 2 + Math.sin(i * .7) * 11 });
+    c.lineCap = "round"; c.strokeStyle = "#5a3a1c"; c.lineWidth = r * 1.4; c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.stroke();
+    for (let i = pts.length - 1; i >= 1; i--) drawShield(c, sk, pts[i].x, pts[i].y, r * .74, i, Math.PI);
+    c.save(); c.translate(pts[0].x, pts[0].y); c.fillStyle = "#5a3a1c"; c.beginPath(); c.moveTo(r * 2.1, 0); c.quadraticCurveTo(r * .7, -r * 1.15, -r * .7, -r * .85);
+    c.lineTo(-r * .7, r * .85); c.quadraticCurveTo(r * .7, r * 1.15, r * 2.1, 0); c.fill(); drawFig(c, fig, r, false);
+    c.fillStyle = sk.sail[0]; c.fillRect(-r * .2, -r * 1.35, r * .55, r * 2.7); c.fillStyle = sk.sail[1]; for (let k = -1; k <= 1; k++) c.fillRect(-r * .2, k * r * .9 - r * .2, r * .55, r * .4);
+    c.restore();
+  }
+  function renderWard() {
+    showPlunder();
+    const list = (wtab === "ships" ? SKINS : FIGS).filter(it => inSeason(it) || unlocked(it)).sort((x, y) => (y.season === SEASON && !!SEASON) - (x.season === SEASON && !!SEASON)), eqId = wtab === "ships" ? prof.eq.skin : prof.eq.fig;
+    const curSkin = SKINS.find(k => k.id === prof.eq.skin) || SKINS[0];
+    $("wardGrid").innerHTML = list.map(it => { const un = unlocked(it), eq = it.id === eqId;
+      const how = (it.season ? SEASON_LABEL[it.season] + " · " : "") + (it.un.t === "free" ? "Starter" : it.un.t === "buy" ? `${it.un.cost.toLocaleString()} plunder` : it.un.label);
+      const btn = eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` :
+        it.un.t === "buy" ? `<button data-buy="${it.id}" ${prof.plunder < it.un.cost ? "disabled" : ""}>Buy · ${it.un.cost.toLocaleString()}</button>` : `<button disabled>🔒 Feat</button>`;
+      return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"}">${un ? "" : `<span class="tag">🔒</span>`}<canvas width="260" height="110" data-pv="${it.id}"></canvas>
+        <b>${it.name}</b><small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
+    $("wardGrid").querySelectorAll("[data-pv]").forEach(cnv => { const id = cnv.dataset.pv;
+      if (wtab === "ships") preview(cnv, SKINS.find(k => k.id === id), prof.eq.fig); else preview(cnv, curSkin, id); });
+  }
+  $("wardGrid").addEventListener("click", e => {
+    const eq = e.target.closest("[data-eq]"), buy = e.target.closest("[data-buy]");
+    if (eq) { prof.eq[wtab === "ships" ? "skin" : "fig"] = eq.dataset.eq; saveProf(); renderWard(); }
+    if (buy) { const it = [...SKINS, ...FIGS].find(x => x.id === buy.dataset.buy); if (it && prof.plunder >= it.un.cost) {
+      prof.plunder -= it.un.cost; prof.owned.push(it.id); prof.eq[wtab === "ships" ? "skin" : "fig"] = it.id; saveProf(); renderWard(); } }
+  });
+  document.querySelectorAll("#ward [data-tab]").forEach(b => b.onclick = () => { wtab = b.dataset.tab;
+    document.querySelectorAll("#ward [data-tab]").forEach(x => x.classList.toggle("on", x === b)); renderWard(); });
+  const openWard = () => { $("ward").classList.remove("hidden"); renderWard(); };
+  $("wardBtn").onclick = openWard; $("wardBtn2").onclick = openWard; $("wardClose").onclick = () => { $("ward").classList.add("hidden"); showPlunder(); };
+  showPlunder();
+  $("name").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+  requestAnimationFrame(t => { last = t; frame(t); });
+})();
+</script>
+</body>
+</html>
