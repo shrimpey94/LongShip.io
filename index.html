@@ -209,11 +209,12 @@ body.shorts #recHint{display:block}
   if (!ctx.roundRect) ctx.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
   const mini = document.getElementById("mini"), mctx = mini.getContext("2d");
   const $ = id => document.getElementById(id);
+  const COARSE = matchMedia("(pointer:coarse)").matches;   // phones / tablets
   let dpr = 1, vw = 0, vh = 0;
   function resize() {
     if (SHORTS) { dpr = 2; vw = 540; vh = 960; cv.width = 1080; cv.height = 1920;   // 1080x1920 vertical video frame
       const h = Math.min(innerHeight, innerWidth * 16 / 9); cv.style.height = h + "px"; cv.style.width = h * 9 / 16 + "px"; return; }
-    dpr = Math.min(2, window.devicePixelRatio || 1); vw = innerWidth; vh = innerHeight; cv.width = vw * dpr; cv.height = vh * dpr; }
+    dpr = Math.min(COARSE ? 1.5 : 2, window.devicePixelRatio || 1); vw = innerWidth; vh = innerHeight; cv.width = vw * dpr; cv.height = vh * dpr; }
   addEventListener("resize", resize); resize();
   const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   // saved progress on this device: plunder, unlocks, equipped look, lifetime stats
@@ -231,18 +232,21 @@ body.shorts #recHint{display:block}
   const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
   const d2 = (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2;
 
+  let warnIsle = null;
   let ships = [], gold = [], powers = [], isles = [], bolts = [], player = null, running = false, tick = 0;
   const input = { x: 0, y: 0, boost: false, active: false }, cam = { x: W / 2, y: W / 2, z: 1 };
 
-  /* ----- spatial grids (rebuilt each frame) so 25 ships x 4000 coins stays fast ----- */
+  /* ----- spatial grids: fixed cell arrays that are emptied and refilled each frame.
+     No new Maps or objects per frame, so the phone's garbage collector stays quiet (less heat). ----- */
   const CELL = 160, GN = Math.ceil(W / CELL);
-  let segGrid = new Map(), goldGrid = new Map();
-  const key = (cx, cy) => cy * GN + cx;
-  function gridAdd(g, x, y, v) { const k = key(clamp((x / CELL) | 0, 0, GN - 1), clamp((y / CELL) | 0, 0, GN - 1)); let a = g.get(k); if (!a) g.set(k, a = []); a.push(v); }
+  const mkGrid = () => Array.from({ length: GN * GN }, () => []);
+  const segGrid = mkGrid(), goldGrid = mkGrid(), segUsed = [], goldUsed = [];
+  function gridClear(g, used) { for (let j = 0; j < used.length; j++) g[used[j]].length = 0; used.length = 0; }
+  function gridAdd(g, used, x, y, v) { const k = clamp((y / CELL) | 0, 0, GN - 1) * GN + clamp((x / CELL) | 0, 0, GN - 1), a = g[k]; if (!a.length) used.push(k); a.push(v); }
   function gridNear(g, x, y, r, fn) {
     const x0 = clamp(((x - r) / CELL) | 0, 0, GN - 1), x1 = clamp(((x + r) / CELL) | 0, 0, GN - 1);
     const y0 = clamp(((y - r) / CELL) | 0, 0, GN - 1), y1 = clamp(((y + r) / CELL) | 0, 0, GN - 1);
-    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const a = g.get(key(cx, cy)); if (a) for (const v of a) if (fn(v) === false) return; }
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const a = g[cy * GN + cx]; for (let j = 0; j < a.length; j++) if (fn(a[j]) === false) return; }
   }
 
   /* ===================== world ===================== */
@@ -255,7 +259,18 @@ body.shorts #recHint{display:block}
       isles.push({ x, y, r, pts, trees: Array.from({ length: (r / 35) | 0 }, () => [rnd(-.5, .5) * r, rnd(-.5, .5) * r]) });
     }
   }
-  const inIsle = (x, y, pad) => isles.some(o => d2(x, y, o.x, o.y) < (o.r + pad) ** 2);
+  const inIsle = (x, y, pad) => isles.some(o => d2(x, y, o.x, o.y) < (o.r + pad) ** 2);   // generous circle: used for spawning only
+  // the real, drawn sand line of an isle in the direction of (x, y)
+  function coast(o, x, y) {
+    let a = Math.atan2(y - o.y, x - o.x); if (a < 0) a += Math.PI * 2;
+    const n = o.pts.length, f = a / (Math.PI * 2) * n, k = f | 0, t = f - k;
+    return o.pts[k % n] * (1 - t) + o.pts[(k + 1) % n] * t;
+  }
+  // ships only run aground when they actually touch the sand you can see
+  function hitIsle(x, y, pad) {
+    for (const o of isles) { const dd = d2(x, y, o.x, o.y); if (dd > (o.r * 1.13 + pad) ** 2) continue; if (dd < (coast(o, x, y) + pad) ** 2) return o; }
+    return null;
+  }
   function freeSpot(pad, edge = 300) { for (let t = 0; t < 60; t++) { const x = rnd(edge, W - edge), y = rnd(edge, W - edge); if (!inIsle(x, y, pad)) return [x, y]; } return [W / 2, W / 2]; }
   function spawnGold(n, x, y, spread, big) {
     for (let i = 0; i < n; i++) {
@@ -302,21 +317,28 @@ body.shorts #recHint{display:block}
     const fig = kind === "rogue" ? "skull" : kind === "player" ? (FIGS.find(f => f.id === prof.eq.fig && unlocked(f)) || FIGS[0]).id : figPool[(Math.random() * figPool.length) | 0].id;
     const s = { name, kind, isPlayer: kind === "player", x, y, a, target: a, len: BASE_LEN, path: [], skin, fig, alive: true, score: 0, kills: 0, peak: BASE_LEN,
                 think: 0, boosting: false, fleeT: 0, buffs: {}, ward: 0, segs: [] };
-    for (let i = 0; i < 160; i++) s.path.push({ x: x - Math.cos(a) * i * 1.5, y: y - Math.sin(a) * i * 1.5 });
+    for (let i = 160; i >= 1; i--) s.path.push({ x: x - Math.cos(a) * i * PSTEP, y: y - Math.sin(a) * i * PSTEP });
     return s;
   }
+  const PSTEP = 3;   // the wake is remembered as a point every 3px (was every frame)
   const radius = s => 9 + Math.min(15, Math.sqrt(s.len) * 1.25);
   const gap = s => 11 * radius(s) / 11;
+  // places shields along the wake. Reuses the same segment objects every frame (no garbage),
+  // and tracks a bounding box so off-screen ships can be skipped when drawing.
   function buildSegs(s) {
-    const out = [{ x: s.path[0].x, y: s.path[0].y }], sp = gap(s);
-    let acc = 0, prev = s.path[0], k = 1;
-    while (out.length <= s.len && k < s.path.length) {
-      const p = s.path[k], d = Math.hypot(p.x - prev.x, p.y - prev.y);
-      if (acc + d >= sp) { out.push({ x: p.x, y: p.y }); acc = 0; } else acc += d;
-      prev = p; k++;
+    const P = s.path, segs = s.segs, sp = gap(s);
+    let n = 0, px = s.x, py = s.y, need = sp, k = P.length - 1;
+    let o = segs[0] || (segs[0] = { s, i: 0, x: 0, y: 0, warn: -99 }); o.x = px; o.y = py; o.s = s; n = 1;
+    let bx0 = px, bx1 = px, by0 = py, by1 = py;
+    while (n <= s.len && k >= 0) {
+      const q = P[k], dx = q.x - px, dy = q.y - py, d = Math.sqrt(dx * dx + dy * dy);
+      if (d >= need) { const t = need / d; px += dx * t; py += dy * t; need = sp;
+        o = segs[n] || (segs[n] = { s, i: n, x: 0, y: 0, warn: -99 }); o.x = px; o.y = py; o.s = s; n++;
+        if (px < bx0) bx0 = px; else if (px > bx1) bx1 = px; if (py < by0) by0 = py; else if (py > by1) by1 = py; }
+      else { need -= d; px = q.x; py = q.y; k--; }
     }
-    if (s.path.length > k + 60) s.path.length = k + 60;
-    s.segs = out;
+    segs.length = n; s.bx0 = bx0; s.bx1 = bx1; s.by0 = by0; s.by1 = by1;
+    if (k > 200) P.splice(0, k - 40);   // forget wake older than the stern, in batches
   }
 
   function start() {
@@ -374,12 +396,14 @@ body.shorts #recHint{display:block}
     gridNear(segGrid, x, y, margin + 30, v => {
       if (v.s === b && v.i < 10) return;
       const rr = (radius(v.s) + margin) ** 2;
-      if (d2(x, y, v.x, v.y) < rr) { hit = v.s.buffs.ghost && v.s !== b ? 0 : 2; return false; }
+      if (d2(x, y, v.x, v.y) < rr) { hit = (v.s.buffs.ghost || v.s.solidify) && v.s !== b ? 0 : 2; return false; }
     });
     return hit;
   }
   function botThink(b) {
-    if (--b.think > 0) return; b.think = 5 + ((Math.random() * 4) | 0);
+    if (--b.think > 0) return;
+    const far = d2(b.x, b.y, cam.x, cam.y) > 1500 * 1500;   // nobody can see this bot: think less often, check fewer headings
+    b.think = (far ? 12 : 5) + ((Math.random() * 4) | 0);
     const r = radius(b), rogue = b.kind === "rogue";
     // 1) goal direction
     let goal = null, why = "wander";
@@ -406,7 +430,7 @@ body.shorts #recHint{display:block}
     }
     // 2) pick the safest heading close to the goal
     let bestA = goal, bestScore = -1e9;
-    for (let k = -6; k <= 6; k++) {
+    for (let k = -6; k <= 6; k += far ? 2 : 1) {
       const a = b.a + k * .26, cost = Math.abs(angDiff(a, goal)) * 1.2 + Math.abs(k) * .05;
       let risk = 0;
       for (const dist of [r * 1.6 + 20, r * 2.4 + 55, r * 3.2 + 100, r * 4 + 160]) {
@@ -468,15 +492,16 @@ body.shorts #recHint{display:block}
       player.boosting = input.boost;
     }
     // grids
-    segGrid = new Map(); goldGrid = new Map();
-    for (const s of ships) if (s.alive) s.segs.forEach((p, i) => gridAdd(segGrid, p.x, p.y, { s, i, x: p.x, y: p.y }));
-    for (const g of gold) gridAdd(goldGrid, g.x, g.y, g);
+    gridClear(segGrid, segUsed); gridClear(goldGrid, goldUsed);
+    for (const s of ships) if (s.alive) { const sg = s.segs; for (let j = 0; j < sg.length; j++) gridAdd(segGrid, segUsed, sg[j].x, sg[j].y, sg[j]); }
+    for (let j = 0; j < gold.length; j++) gridAdd(goldGrid, goldUsed, gold[j].x, gold[j].y, gold[j]);
 
     for (const s of ships) {
       if (!s.alive) continue;
       if (!s.isPlayer) botThink(s);
-      for (const k in s.buffs) { s.buffs[k].t -= f; if (s.buffs[k].t <= 0) { delete s.buffs[k]; if (k === "ward") s.ward = 0; } }
+      for (const k in s.buffs) { s.buffs[k].t -= f; if (s.buffs[k].t <= 0) { delete s.buffs[k]; if (k === "ward") s.ward = 0; if (k === "ghost") s.solidify = 75; } }
       if (s.invuln) s.invuln = Math.max(0, s.invuln - f);
+      if (s.solidify) s.solidify = Math.max(0, s.solidify - f);   // a ghost fading back in can't sink anyone (or be sunk) for ~1s
       if (s.boss && SEASON === "halloween") { s.phase = (s.phase || 0) + f; if (s.phase > 540) { s.phase = 0; s.buffs.ghost = { t: 180, max: 180 }; } }
       const free = !!s.buffs.oars, boost = (s.boosting && s.len > BASE_LEN) || free;
       const turn = (TURN - Math.min(.015, s.len / 9000)) * f;
@@ -484,10 +509,10 @@ body.shorts #recHint{display:block}
       const sp = (boost ? BOOST : SPEED) * (free ? 1.15 : 1) * f;
       s.x += Math.cos(s.a) * sp; s.y += Math.sin(s.a) * sp;
       if (s.boosting && !free && s.len > BASE_LEN) { s.drop = (s.drop || 0) + f; if (s.drop >= 22) { s.drop = 0; s.len--; const t = s.segs[s.segs.length - 1]; if (t) addLoot("coin", t.x, t.y, 0); } }
-      s.path.unshift({ x: s.x, y: s.y });
+      const lp = s.path[s.path.length - 1]; if (!lp || d2(lp.x, lp.y, s.x, s.y) >= PSTEP * PSTEP) s.path.push({ x: s.x, y: s.y });
       buildSegs(s);
       if (s.x < 10 || s.y < 10 || s.x > W - 10 || s.y > W - 10) { sink(s, null, "edge"); continue; }
-      if (inIsle(s.x, s.y, radius(s) * .4)) { if (s.ward || s.invuln) { s.a += Math.PI; if (s.ward) { s.ward = 0; delete s.buffs.ward; s.invuln = 90; } } else { sink(s, null, "rock"); continue; } }
+      if (hitIsle(s.x, s.y, radius(s) * .15)) { if (s.ward || s.invuln) { s.a += Math.PI; if (s.ward) { s.ward = 0; delete s.buffs.ward; s.invuln = 90; } } else { sink(s, null, "rock"); continue; } }
       // gold: magnet pulls, then eat
       const r = radius(s) + 7, pull = s.buffs.magnet ? 190 : 0, mult = s.buffs.mead ? 2 : 1;
       gridNear(goldGrid, s.x, s.y, Math.max(r, pull), g => {
@@ -498,18 +523,23 @@ body.shorts #recHint{display:block}
       });
       for (let i = powers.length - 1; i >= 0; i--) { const p = powers[i]; if (d2(p.x, p.y, s.x, s.y) < (r + 16) ** 2) { powers.splice(i, 1); grant(s, p.p); } }
     }
-    gold = gold.filter(g => !g.eaten);
-    for (const g of gold) if (g.glow) g.glow = Math.max(0, g.glow - f);
+    let gw = 0; for (let j = 0; j < gold.length; j++) { const g = gold[j]; if (g.eaten) continue; if (g.glow) g.glow = Math.max(0, g.glow - f); gold[gw++] = g; } gold.length = gw;
     for (const s of ships) if (s.alive && s.len > s.peak) s.peak = s.len;
     if (player && player.alive && player.len >= 150) achieve("len150");
     // prow vs shields
     for (const s of ships) {
-      if (!s.alive || s.buffs.ghost || s.invuln) continue;
+      if (!s.alive || s.buffs.ghost || s.invuln || s.solidify) continue;
       const rs = radius(s) * .55; let hitBy = null;
-      gridNear(segGrid, s.x, s.y, 60, v => { if (v.s === s || !v.s.alive || v.i === 0 || v.s.buffs.ghost) return;
+      gridNear(segGrid, s.x, s.y, 60, v => { if (v.s === s || !v.s.alive || v.i === 0 || v.s.buffs.ghost || v.s.solidify) return;
         if (d2(s.x, s.y, v.x, v.y) < (radius(v.s) * .78 + rs) ** 2) { hitBy = v.s; return false; } });
       if (hitBy) sink(s, hitBy, "ship");
     }
+    // danger warning: light up enemy shields and coastline just ahead of YOUR prow
+    warnIsle = null;
+    if (player && player.alive) { const pr = radius(player), hx = player.x + Math.cos(player.a) * pr * 1.2, hy = player.y + Math.sin(player.a) * pr * 1.2, rs = pr * .55;
+      gridNear(segGrid, hx, hy, 130, v => { if (v.s === player || v.i === 0 || !v.s.alive || v.s.buffs.ghost) return;
+        const lim = radius(v.s) * .78 + rs + 55; if (d2(hx, hy, v.x, v.y) < lim * lim) v.warn = tick; });
+      warnIsle = hitIsle(hx, hy, 45); }
     if (gold.length < GOLD_TARGET) spawnGold(Math.min(20, GOLD_TARGET - gold.length));
     for (let i = powers.length - 1; i >= 0; i--) if ((powers[i].life -= f) <= 0) powers.splice(i, 1);
     if (powers.length < POWER_TARGET && Math.random() < .02 * f) spawnPower();
@@ -518,22 +548,25 @@ body.shorts #recHint{display:block}
     const follow = player && player.alive ? player : (!player ? ships.find(x => x.alive) : null);
     if (follow) { cam.x += (follow.x - cam.x) * .1; cam.y += (follow.y - cam.y) * .1; }
     const tz = (player ? clamp(1.1 - player.len / 300, .55, 1.05) : .8) * (SHORTS ? .78 : clamp(vw / 1000, .62, 1));
-    cam.z += (tz - cam.z) * .03;
+    cam.z += (Math.max(COARSE ? .45 : .4, tz) - cam.z) * .03;   // don't zoom out so far on phones that ships become specks
   }
 
   /* ===================== drawing ===================== */
   const onScreen = (x, y, m) => Math.abs(x - cam.x) < vw / 2 / cam.z + m && Math.abs(y - cam.y) < vh / 2 / cam.z + m;
+  let seaG = null, seaW = 0, seaH = 0;
   function drawSea() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const g = ctx.createRadialGradient(vw / 2, vh / 2, 40, vw / 2, vh / 2, Math.max(vw, vh));
-    g.addColorStop(0, TH ? TH.sea[0] : "#14506d"); g.addColorStop(1, TH ? TH.sea[1] : "#082a3d"); ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
+    if (!seaG || seaW !== vw || seaH !== vh) { seaW = vw; seaH = vh; seaG = ctx.createRadialGradient(vw / 2, vh / 2, 40, vw / 2, vh / 2, Math.max(vw, vh));
+      seaG.addColorStop(0, TH ? TH.sea[0] : "#14506d"); seaG.addColorStop(1, TH ? TH.sea[1] : "#082a3d"); }
+    ctx.fillStyle = seaG; ctx.fillRect(0, 0, vw, vh);
     ctx.translate(vw / 2, vh / 2); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
     const st = 110, hx = vw / 2 / cam.z, hy = vh / 2 / cam.z;
     const x0 = Math.floor((cam.x - hx) / st) * st, y0 = Math.floor((cam.y - hy) / st) * st;
-    ctx.strokeStyle = TH ? TH.wave : "rgba(255,255,255,.055)"; ctx.lineWidth = 2;
+    ctx.strokeStyle = TH ? TH.wave : "rgba(255,255,255,.055)"; ctx.lineWidth = 2; ctx.beginPath();
     for (let y = y0; y < cam.y + hy + st; y += st) for (let x = x0; x < cam.x + hx + st; x += st) {
       const o = Math.sin((x * .7 + y) * .012 + tick * .02) * 10, oy = ((x * 13 + y * 7) % 40) - 20;
-      ctx.beginPath(); ctx.moveTo(x + o, y + oy); ctx.quadraticCurveTo(x + 14 + o, y + oy - 6, x + 28 + o, y + oy); ctx.stroke(); }
+      ctx.moveTo(x + o, y + oy); ctx.quadraticCurveTo(x + 14 + o, y + oy - 6, x + 28 + o, y + oy); }
+    ctx.stroke();   // one stroke for every wave instead of one each
     // edge of the world
     ctx.fillStyle = TH ? TH.edge : "rgba(2,10,18,.55)";
     ctx.fillRect(-3000, -3000, W + 6000, 3000); ctx.fillRect(-3000, W, W + 6000, 3000); ctx.fillRect(-3000, 0, 3000, W); ctx.fillRect(W, 0, 3000, W);
@@ -545,6 +578,7 @@ body.shorts #recHint{display:block}
       const ic = TH ? TH.isle : { shallow: "rgba(160,220,230,.18)", sand: "#c9b27c", grass: "#6b7d4f", rock: "#7a7f86", tree: "#2f4a2e" };
       ctx.fillStyle = ic.shallow; path(1.18); ctx.fill();          // shallows
       ctx.fillStyle = ic.sand; path(1.0); ctx.fill();               // sand / snow / dead earth
+      if (o === warnIsle) { ctx.strokeStyle = `rgba(255,70,50,${.55 + .35 * Math.sin(tick * .4)})`; ctx.lineWidth = 4; ctx.stroke(); }   // you're about to run aground
       ctx.fillStyle = ic.grass; path(.8); ctx.fill();
       ctx.fillStyle = ic.rock; path(.38); ctx.fill();
       o.trees.forEach(([tx, ty], k) => { const x = o.x + tx, y = o.y + ty;
@@ -609,7 +643,7 @@ body.shorts #recHint{display:block}
     }
     return false;
   }
-  function drawLootItem(c, g, x, y, sc) {
+  function drawLootItem(c, g, x, y, sc, still) {
     const tw = Math.sin(tick * .05 + g.t);
     if (drawSeasonLoot(c, g, x, y, sc)) return;
     switch (g.type) {
@@ -638,9 +672,23 @@ body.shorts #recHint{display:block}
         c.fillStyle = "#8b5e34"; c.beginPath(); c.moveTo(x - r, y - r * .5); c.quadraticCurveTo(x, y - r * 1.3, x + r, y - r * .5); c.fill();
         c.fillStyle = "#f4d03f"; c.fillRect(x - r, y - r * .15, r * 2, r * .2); c.fillRect(x - r * .15, y - r * .3, r * .3, r * .5); break; }
     }
-    if (tw > .93 && g.type !== "silver") { c.fillStyle = "#fffbe6"; c.fillRect(x - 2 * sc, y - 2 * sc, 1.4, 1.4); }
+    if (!still && tw > .93 && g.type !== "silver") { c.fillStyle = "#fffbe6"; c.fillRect(x - 2 * sc, y - 2 * sc, 1.4, 1.4); }
   }
-  function drawGold() { for (const g of gold) if (onScreen(g.x, g.y, 20)) drawLootItem(ctx, g, g.x, g.y, 1.4); }
+  // loot that doesn't animate is drawn once into a small picture, then stamped (far cheaper than 4-8 shapes each)
+  const lootCache = new Map(), LOOT_ANIM = { halloween: ["gem", "goblet"], christmas: ["coin"] }, LS = 24, LR = 2;
+  function lootSprite(g) {
+    const k = g.type + "|" + (g.type === "gem" ? g.h : g.type === "chest" ? Math.floor(g.t) % 4 : "");
+    let c = lootCache.get(k); if (c) return c;
+    c = document.createElement("canvas"); c.width = c.height = LS * 2 * LR; const x = c.getContext("2d"); x.scale(LR, LR);
+    drawLootItem(x, g, LS, LS, 1.4, true); lootCache.set(k, c); return c;
+  }
+  function drawGold() {
+    const hx = vw / 2 / cam.z + 20, hy = vh / 2 / cam.z + 20, cx = cam.x, cy = cam.y, anim = SEASON ? LOOT_ANIM[SEASON] : null;
+    for (let j = 0; j < gold.length; j++) { const g = gold[j]; if (Math.abs(g.x - cx) > hx || Math.abs(g.y - cy) > hy) continue;
+      if (anim && anim.includes(g.type)) { drawLootItem(ctx, g, g.x, g.y, 1.4); continue; }
+      ctx.drawImage(lootSprite(g), g.x - LS, g.y - LS, LS * 2, LS * 2);
+      if (g.type !== "silver" && Math.sin(tick * .05 + g.t) > .93) { ctx.fillStyle = "#fffbe6"; ctx.fillRect(g.x - 2.8, g.y - 2.8, 1.4, 1.4); } }
+  }
   function drawPowers() {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     for (const p of powers) { if (!onScreen(p.x, p.y, 40)) continue;
@@ -653,9 +701,11 @@ body.shorts #recHint{display:block}
       ctx.globalAlpha = 1; }
   }
   function drawShip(s) {
-    if (!s.alive || !onScreen(s.x, s.y, 900)) return;
-    const r = radius(s), segs = s.segs, ghost = s.buffs.ghost, rogue = s.kind === "rogue";
-    ctx.globalAlpha = ghost ? .45 : 1;
+    if (!s.alive) return;
+    const r = radius(s), segs = s.segs, ghost = s.buffs.ghost, rogue = s.kind === "rogue", m = r * 2.6 + 30;
+    const hx = vw / 2 / cam.z, hy = vh / 2 / cam.z;
+    if (s.bx1 + m < cam.x - hx || s.bx0 - m > cam.x + hx || s.by1 + m < cam.y - hy || s.by0 - m > cam.y + hy) return;   // whole ship off-screen
+    ctx.globalAlpha = ghost ? .45 : s.solidify ? ((tick | 0) % 10 < 5 ? .9 : .5) : 1;
     // wake behind the stern
     const t = segs[segs.length - 1]; ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.beginPath(); ctx.arc(t.x, t.y, r * 1.3, 0, 7); ctx.fill();
     // hull
@@ -663,11 +713,16 @@ body.shorts #recHint{display:block}
     ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y); for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y); ctx.stroke();
     ctx.strokeStyle = "#6b4423"; ctx.lineWidth = r * 1.25; ctx.stroke();
     // oars sweeping on both sides
-    ctx.strokeStyle = "#c8a46a"; ctx.lineWidth = 1.6;
-    for (let i = 2; i < segs.length - 1; i += 2) { const p = segs[i], q = segs[i - 1], a = Math.atan2(q.y - p.y, q.x - p.x), sw = Math.sin(tick * (s.boosting ? .3 : .15) + i) * .5;
-      for (const side of [1, -1]) { const oa = a + side * (Math.PI / 2 + sw * side); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(oa) * r * 1.6, p.y + Math.sin(oa) * r * 1.6); ctx.stroke(); } }
-    // shields
-    for (let i = segs.length - 1; i >= 1; i--) { const p = segs[i], q = segs[i - 1]; drawShield(ctx, s.skin, p.x, p.y, r * .74, i, Math.atan2(q.y - p.y, q.x - p.x)); }
+    ctx.strokeStyle = "#c8a46a"; ctx.lineWidth = 1.6; ctx.beginPath();   // all oars in one stroke
+    for (let i = 2; i < segs.length - 1; i += 2) { const p = segs[i]; if (!onScreen(p.x, p.y, r * 2)) continue; const q = segs[i - 1], a = Math.atan2(q.y - p.y, q.x - p.x), sw = Math.sin(tick * (s.boosting ? .3 : .15) + i) * .5;
+      for (let side = -1; side <= 1; side += 2) { const oa = a + side * (Math.PI / 2 + sw * side); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(oa) * r * 1.6, p.y + Math.sin(oa) * r * 1.6); } }
+    ctx.stroke();
+    // shields (only the ones on screen), with a red danger ring on any your prow is about to hit
+    const rad = r * .74, warned = [];
+    for (let i = segs.length - 1; i >= 1; i--) { const p = segs[i]; if (!onScreen(p.x, p.y, rad * 1.5)) continue; const q = segs[i - 1];
+      drawShieldFast(s.skin, p.x, p.y, rad, i, Math.atan2(q.y - p.y, q.x - p.x)); if (tick - p.warn < 4) warned.push(p); }
+    if (warned.length) { ctx.strokeStyle = `rgba(255,60,40,${.7 + .3 * Math.sin(tick * .5)})`; ctx.lineWidth = 3.5; ctx.beginPath();
+      for (const p of warned) { ctx.moveTo(p.x + rad * 1.25, p.y); ctx.arc(p.x, p.y, rad * 1.25, 0, 7); } ctx.stroke(); }
     // prow + sail
     ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a);
     ctx.fillStyle = "#5a3a1c"; ctx.beginPath(); ctx.moveTo(r * 2.1, 0); ctx.quadraticCurveTo(r * .7, -r * 1.15, -r * .7, -r * .85);
@@ -687,7 +742,7 @@ body.shorts #recHint{display:block}
   function drawShield(c, sk, x, y, rad, i, ang) {
     const alt = i % 2, base = sk.pat === "rainbow" ? `hsl(${(i * 24 + tick * 2) % 360},70%,55%)` : alt ? sk.a : sk.b, other = alt ? sk.b : sk.a;
     if (sk.glow) { c.fillStyle = sk.glow + "33"; c.beginPath(); c.arc(x, y, rad * 1.35, 0, 7); c.fill(); }
-    if (sk.ghostly) c.globalAlpha *= .7;
+    const ga = c.globalAlpha; if (sk.ghostly) c.globalAlpha = ga * .7;   // (bug fix: this used to keep multiplying, fading the ship to invisible)
     c.fillStyle = base; c.beginPath(); c.arc(x, y, rad, 0, 7); c.fill();
     c.save(); c.beginPath(); c.arc(x, y, rad, 0, 7); c.clip();
     c.strokeStyle = other; c.fillStyle = other; c.lineWidth = rad * .28;
@@ -709,6 +764,19 @@ body.shorts #recHint{display:block}
     c.restore();
     c.strokeStyle = "#2b1a0b"; c.lineWidth = Math.max(1.2, rad * .12); c.beginPath(); c.arc(x, y, rad, 0, 7); c.stroke();
     c.fillStyle = "#b8bcc2"; c.beginPath(); c.arc(x, y, rad * .26, 0, 7); c.fill();
+    c.globalAlpha = ga;
+  }
+  // in-game shields: each skin's two shield faces are painted once, then stamped. Animated patterns still draw live.
+  const shieldCache = new Map(), SR = 32;
+  function drawShieldFast(sk, x, y, rad, i, ang) {
+    if (sk.pat === "rainbow" || sk.pat === "flame") { drawShield(ctx, sk, x, y, rad, i, ang); return; }
+    const key = sk.id + (i % 2); let spr = shieldCache.get(key);
+    if (!spr) { spr = document.createElement("canvas"); const half = Math.ceil(SR * 1.4); spr.width = spr.height = half * 2;
+      drawShield(spr.getContext("2d"), { ...sk, ghostly: false }, half, half, SR, i % 2, 0); spr.k = half / SR; shieldCache.set(key, spr); }
+    const h = rad * spr.k, ga = ctx.globalAlpha; if (sk.ghostly) ctx.globalAlpha = ga * .7;
+    if (sk.pat === "split") { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.drawImage(spr, -h, -h, h * 2, h * 2); ctx.restore(); }
+    else ctx.drawImage(spr, x - h, y - h, h * 2, h * 2);
+    ctx.globalAlpha = ga;
   }
   function drawFig(c, fig, r, rogue) {   // drawn in prow space: +x is forward
     const hx = r * 2.0, eye = rogue ? "#ff5544" : "#fff";
@@ -765,7 +833,7 @@ body.shorts #recHint{display:block}
       if (!fogSprite) { fogSprite = document.createElement("canvas"); fogSprite.width = fogSprite.height = 128; const fc = fogSprite.getContext("2d"), g = fc.createRadialGradient(64, 64, 0, 64, 64, 64);
         g.addColorStop(0, "rgba(170,150,200,.10)"); g.addColorStop(1, "rgba(170,150,200,0)"); fc.fillStyle = g; fc.fillRect(0, 0, 128, 128); }
       if (!vigSprite || vigSprite.w !== vw || vigSprite.h !== vh) { vigSprite = document.createElement("canvas"); vigSprite.width = 256; vigSprite.height = 256; vigSprite.w = vw; vigSprite.h = vh;
-        const vc = vigSprite.getContext("2d"), v = vc.createRadialGradient(128, 128, 128 * .42, 128, 128, 128 * 1.06); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(10,0,20,.45)"); vc.fillStyle = v; vc.fillRect(0, 0, 256, 256); }
+        const vc = vigSprite.getContext("2d"), v = vc.createRadialGradient(128, 128, 128 * .42, 128, 128, 128 * 1.06); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(10,0,20,.3)"); vc.fillStyle = v; vc.fillRect(0, 0, 256, 256); }
       for (const f of fogs) { f.x = (f.x + f.v) % 1.3; const x = (f.x - .15) * vw, y = f.y * vh, R = f.r * Math.max(vw, vh); ctx.drawImage(fogSprite, x - R, y - R, R * 2, R * 2); }
       ctx.drawImage(vigSprite, 0, 0, vw, vh); }
     if (TH.sky === "bats") { ctx.fillStyle = "rgba(15,5,20,.85)";
@@ -816,6 +884,7 @@ body.shorts #recHint{display:block}
 
   let last = performance.now();
   function frame(now) {
+    if (now - last < 10) { requestAnimationFrame(frame); return; }   // 120Hz phones: run at 60fps instead of burning 2x the battery
     const f = clamp((now - last) / (1000 / 60), 0, 3); last = now;
     step(f); drawSea(); drawIsles(); drawGold(); drawPowers();
     for (const s of ships) if (!s.isPlayer) drawShip(s); if (player) drawShip(player); drawBolts();
