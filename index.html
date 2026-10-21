@@ -481,7 +481,7 @@ body.shorts #sndBar{display:none}
     // camera
     const follow = player ? (player.alive ? player : null) : ships.find(x => x.alive && !x.hidden && x.kind === "bot");
     if (follow) { cam.x += (follow.x - cam.x) * .1; cam.y += (follow.y - cam.y) * .1; }
-    const tz = (player && player.alive ? clamp(1.1 - player.len / 300, .55, 1.05) : .8) * (SHORTS ? .78 : clamp(vw / 1000, .62, 1));
+    const tz = (player && player.alive ? clamp(1.1 - player.len / 300, .55, 1.05) : .8) * (SHORTS ? 1.05 : clamp(vw / 1000, .62, 1));
     cam.z += (Math.max(COARSE ? .45 : .4, tz) - cam.z) * .03;   // don't zoom out so far on phones that ships become specks
   }
 
