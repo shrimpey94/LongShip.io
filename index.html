@@ -119,7 +119,7 @@ body.shorts #sndBar{display:none}
 <div class="board" id="board"></div>
 <canvas id="mini" width="240" height="240"></canvas>
 <div id="toast"></div>
-<button id="recBtn" title="Record a vertical clip for TikTok / Shorts">● REC</button><div id="recHint">Shorts mode · 9:16 · press REC, play, press again to save (auto-stops at 59s)</div>
+<button id="recBtn" title="Record a vertical clip for TikTok / Shorts">● REC</button><div id="recHint">Shorts mode · 9:16 · press REC, play, press again to save (auto-stops at 59s). Records the game's music and sound effects too.</div>
 <div id="ward" class="hidden"><div class="top"><h2>🎨 Wardrobe</h2><span>Plunder: <span class="plunder" data-plunder></span></span><button class="btn2" id="wardClose" style="margin:0">Done</button></div>
   <div class="tabs"><button data-tab="ships" class="on">⛵ Ship skins</button><button data-tab="figs">🐉 Figureheads</button><button data-tab="trails">✨ Trails</button></div>
   <div class="grid" id="wardGrid"></div>
@@ -307,9 +307,9 @@ body.shorts #sndBar{display:none}
      frame drum, low drone and a plucked lyre melody. 🔊 / 🎵 buttons mute effects and music separately (remembered). */
   const snd = { ac: null, sfx: null, mus: null, on: store.get("ls_sfx") !== "0", music: store.get("ls_music") !== "0", combo: 0, lastCoin: 0, lastWarn: 0, boostG: null, next: 0, step: 0, timer: 0, note: 2 };
   function audioInit() {
-    if (snd.ac || SHORTS) return;
+    if (snd.ac) return;
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    const ac = snd.ac = new AC(), master = ac.createGain(); master.gain.value = .8; master.connect(ac.destination);
+    const ac = snd.ac = new AC(), master = snd.master = ac.createGain(); master.gain.value = .8; master.connect(ac.destination);
     snd.sfx = ac.createGain(); snd.sfx.gain.value = snd.on ? 1 : 0; snd.sfx.connect(master);
     snd.mus = ac.createGain(); snd.mus.gain.value = snd.music ? .55 : 0; snd.mus.connect(master);
     // one second of noise, reused by every whoosh / crash / drum
@@ -1202,12 +1202,16 @@ body.shorts #sndBar{display:none}
   }
   // built-in clip recorder (Shorts mode only): records the 1080x1920 canvas straight to a video file
   let rec = null, recChunks = [], recStart = 0;
-  function recPick() { for (const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; return ""; }
+  function recPick() { for (const m of ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1,opus", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"]) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; return ""; }
   function recToggle() {
     const btn = $("recBtn");
     if (rec) { rec.stop(); return; }
     const mime = recPick(); if (!mime) { toast("Recording isn't supported in this browser", "Try Chrome or Edge"); return; }
-    recChunks = []; rec = new MediaRecorder(cv.captureStream(60), { mimeType: mime, videoBitsPerSecond: 10e6 });
+    // the clip gets the game's own music and sound effects: everything the speakers play is also sent into the recording
+    audioInit(); if (snd.ac && snd.ac.state === "suspended") snd.ac.resume();
+    const stream = cv.captureStream(60);
+    if (snd.ac) { if (!snd.recDest) { snd.recDest = snd.ac.createMediaStreamDestination(); snd.master.connect(snd.recDest); } snd.recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t)); }
+    recChunks = []; rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 10e6, audioBitsPerSecond: 160e3 });
     rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
     rec.onstop = () => { const blob = new Blob(recChunks, { type: mime }), a = document.createElement("a"), ext = mime.includes("mp4") ? "mp4" : "webm";
       a.href = URL.createObjectURL(blob); a.download = `longship-${SEASON || "classic"}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.${ext}`; document.body.appendChild(a); a.click();
