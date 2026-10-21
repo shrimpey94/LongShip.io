@@ -4,7 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Longship.io · Busterrdust</title>
-<meta name="description" content="A tiny Viking .io game. Steer your longship, gather gold, grow your shield wall, grab runestone power-ups and outlast the raiders.">
+<meta name="description" content="A free Viking .io game. Steer your longship, gather gold, grow your shield wall, grab runestone power-ups and outlast the raiders. Plays on phones and computers.">
+<meta name="theme-color" content="#06192a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Busterrdust Games">
+<meta property="og:title" content="Longship.io · Free Viking .io game">
+<meta property="og:description" content="Grow your shield wall, sink rival raiders and top the live high-score board. Free in your browser, no download.">
+<meta property="og:url" content="https://busterrdust.com/games/longship/">
+<meta property="og:image" content="https://busterrdust.com/games/longship/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Longship.io: Viking longships with shield walls racing across the sea">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Longship.io · Free Viking .io game">
+<meta name="twitter:description" content="Grow your shield wall, sink rival raiders and top the live high-score board. Free in your browser.">
+<meta name="twitter:image" content="https://busterrdust.com/games/longship/og.jpg">
 <style>
 :root{--ink:#f3ead6;--gold:#e7b54a;--deep:#06192a}
 *{box-sizing:border-box}
@@ -52,6 +66,12 @@ body.shorts #recHint{display:block}
 .legend span{white-space:nowrap}
 .r0{color:#d5d8dc}.r1{color:#58d68d}.r2{color:#5dade2}.r3{color:#f5b041}
 .hidden{display:none!important}
+#sndBar{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:35;display:flex;gap:6px}
+#sndBar button{width:36px;height:36px;border-radius:50%;border:1px solid #ffffff2a;background:#0007;font-size:16px;line-height:1;cursor:pointer;padding:0}
+body.shorts #sndBar{display:none}
+.card small.fine{font-size:11.5px;opacity:.6}.card small.fine a{color:var(--gold)}
+.lb .del{margin:0 0 0 6px;padding:3px 7px;border-radius:8px;border:1px solid #ff6b6b66;background:#ff6b6b22;color:#ffb3b3;font:700 11px system-ui;cursor:pointer}
+.lb .del.sure{background:#c0392b;color:#fff}
 .lb{margin:6px auto 4px;max-width:330px;background:#0007;border:1px solid #ffffff1f;border-radius:14px;padding:8px 10px;text-align:left}
 .lbtabs{display:flex;gap:6px;margin-bottom:6px}
 .lbtabs button,.card .lbtabs button{flex:1;margin:0;padding:6px;border-radius:999px;border:2px solid #ffffff22;background:transparent;color:var(--ink);font:700 13px system-ui;cursor:pointer}
@@ -102,6 +122,7 @@ body.shorts #recHint{display:block}
   <div class="grid" id="wardGrid"></div>
   <p style="max-width:760px;opacity:.75;font-size:13px;text-align:center;margin-top:14px">Earn plunder every voyage: your shield wall plus 25 for each raider you sink. Spend it here, or unlock the special skins by pulling off their feats.</p></div>
 <button id="boostBtn" aria-label="Row hard (boost)">ROW!</button>
+<div id="sndBar"><button id="sfxBtn" aria-label="Sound effects on or off">🔊</button><button id="musBtn" aria-label="Music on or off">🎵</button></div>
 
 <div class="screen" id="start"><div class="card">
   <h1>LONG<span>SHIP</span>.io</h1>
@@ -117,6 +138,7 @@ body.shorts #recHint{display:block}
   </div>
   <small>Steer with the mouse, a finger drag, or WASD / arrow keys<br>Row hard: hold click, Space, or ROW! (costs shields)</small>
   <small id="bestLine"></small>
+  <small class="fine">Scores and names on the board are public. <a href="/games/privacy/" target="_blank" rel="noopener">Privacy</a></small>
   <div id="acct"></div>
   <button class="btn2" id="lbBtn">🏆 High scores</button>
   <div id="startLb" class="hidden"><div class="lb"><div class="lbtabs"><button data-lbtab="today" class="on">Today</button><button data-lbtab="all">All-time</button></div><ol data-lblist></ol></div></div>
@@ -126,8 +148,8 @@ body.shorts #recHint{display:block}
   <h1>Sunk!</h1>
   <p id="overText"></p>
   <div class="lb"><div class="lbtabs"><button data-lbtab="today" class="on">Today</button><button data-lbtab="all">All-time</button></div><ol data-lblist></ol></div>
-  <button id="again">Sail again</button><br><button class="btn2" id="wardBtn2">🎨 Wardrobe · <span class="plunder" data-plunder></span> plunder</button>
-  <small><a href="/games/" target="_top" style="color:var(--gold)">Back to Busterrdust Games</a> · <a href="/games/vikingvale" target="_blank" rel="noopener" style="color:var(--gold)">Play VikingVale</a></small>
+  <button id="again">Sail again</button><br><button class="btn2" id="shareBtn">📣 Share my score</button><br><button class="btn2" id="wardBtn2">🎨 Wardrobe · <span class="plunder" data-plunder></span> plunder</button>
+  <small><a href="/games/" target="_top" style="color:var(--gold)">Back to Busterrdust Games</a> · <a href="/games/vikingvale" target="_blank" rel="noopener" style="color:var(--gold)">Play VikingVale</a> · <a href="/games/privacy/" target="_blank" rel="noopener" style="color:var(--gold)">Privacy</a></small>
 </div></div>
 
 <script>
@@ -309,6 +331,77 @@ body.shorts #recHint{display:block}
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const a = g[cy * GN + cx]; for (let j = 0; j < a.length; j++) if (fn(a[j]) === false) return; }
   }
 
+  /* ===================== sound =====================
+     Every sound is made live with Web Audio (no audio files to download). Music is a quiet Viking loop:
+     frame drum, low drone and a plucked lyre melody. 🔊 / 🎵 buttons mute effects and music separately (remembered). */
+  const snd = { ac: null, sfx: null, mus: null, on: store.get("ls_sfx") !== "0", music: store.get("ls_music") !== "0", combo: 0, lastCoin: 0, lastWarn: 0, boostG: null, next: 0, step: 0, timer: 0, note: 2 };
+  function audioInit() {
+    if (snd.ac || SHORTS) return;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const ac = snd.ac = new AC(), master = ac.createGain(); master.gain.value = .8; master.connect(ac.destination);
+    snd.sfx = ac.createGain(); snd.sfx.gain.value = snd.on ? 1 : 0; snd.sfx.connect(master);
+    snd.mus = ac.createGain(); snd.mus.gain.value = snd.music ? .55 : 0; snd.mus.connect(master);
+    // one second of noise, reused by every whoosh / crash / drum
+    snd.noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = snd.noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    // rowing-hard whoosh: a looping filtered noise we just fade up and down
+    const n = ac.createBufferSource(); n.buffer = snd.noise; n.loop = true; const f = ac.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 900; f.Q.value = .7;
+    snd.boostG = ac.createGain(); snd.boostG.gain.value = 0; n.connect(f); f.connect(snd.boostG); snd.boostG.connect(snd.sfx); n.start();
+    snd.next = ac.currentTime + .1; snd.timer = setInterval(musicTick, 120);
+  }
+  ["pointerdown", "touchstart", "keydown"].forEach(ev => addEventListener(ev, () => { audioInit(); if (snd.ac && snd.ac.state === "suspended" && !document.hidden) snd.ac.resume(); }, { passive: true }));
+  document.addEventListener("visibilitychange", () => { if (!snd.ac) return; document.hidden ? snd.ac.suspend() : snd.ac.resume(); });
+  function tone(freq, dur, type = "sine", vol = .2, when = 0, slide = 0, out) {
+    const ac = snd.ac; if (!ac) return; const t = ac.currentTime + when, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0008, t + dur);
+    o.connect(g); g.connect(out || snd.sfx); o.start(t); o.stop(t + dur + .05);
+  }
+  function noise(dur, vol = .2, freq = 1200, type = "lowpass", when = 0, out) {
+    const ac = snd.ac; if (!ac) return; const t = ac.currentTime + when, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = snd.noise; f.type = type; f.frequency.value = freq; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0008, t + dur);
+    s.connect(f); f.connect(g); g.connect(out || snd.sfx); s.start(t, Math.random() * .5); s.stop(t + dur + .05);
+  }
+  const sfx = {
+    coin(v) { if (!snd.ac) return; const now = performance.now(); if (now - snd.lastCoin < 45) return;
+      snd.combo = now - snd.lastCoin < 600 ? Math.min(snd.combo + 1, 14) : 0; snd.lastCoin = now;
+      const base = 660 * Math.pow(2, snd.combo / 24);   // gathering a streak climbs in pitch
+      if (v >= 5) { tone(base, .12, "triangle", .16); tone(base * 1.5, .16, "triangle", .14, .07); tone(base * 2, .22, "sine", .1, .14); }
+      else tone(base * (v >= 2 ? 1.25 : 1), .09, "sine", .11); },
+    power(r) { const notes = [523, 659, 784, 1047, 1319]; for (let k = 0; k < 3 + r; k++) tone(notes[k % 5] * (k > 4 ? 2 : 1), .3, "triangle", .13, k * .07);
+      if (r >= 2) noise(.5, .06, 6000, "highpass", .1); },
+    thunder() { noise(.9, .45, 900); tone(70, .7, "sawtooth", .2, 0, .5); noise(.15, .3, 4000, "highpass"); },
+    horn() { tone(110, .75, "sawtooth", .12, 0, 1.02); tone(165, .75, "sawtooth", .08, .02, 1.02); tone(55, .4, "sine", .25, 0, .7); },
+    sunk() { noise(.8, .4, 500); tone(160, 1.1, "sawtooth", .14, 0, .3); tone(90, .9, "sine", .3, .05, .4); },
+    clang() { tone(1240, .4, "square", .07); tone(1870, .3, "square", .05, .01); noise(.1, .15, 5000, "highpass"); },
+    warn() { const now = performance.now(); if (now - snd.lastWarn < 700) return; snd.lastWarn = now; tone(220, .12, "square", .05); tone(220, .12, "square", .05, .16); },
+    click() { tone(1400, .04, "triangle", .07); },
+    buy() { [784, 988, 1175, 1568].forEach((f, k) => tone(f, .25, "triangle", .12, k * .06)); },
+    start() { tone(147, .9, "sawtooth", .1, 0, 1.01); tone(220, .9, "sawtooth", .07, .05, 1.01); noise(.3, .12, 300, "lowpass", .02); },
+    boost(on) { if (!snd.ac) return; snd.boostG.gain.setTargetAtTime(on ? .09 : 0, snd.ac.currentTime, .08); },
+  };
+  // music: 84 bpm, D minor pentatonic. Scheduled a little ahead so it never stutters.
+  const SCALE = [146.8, 174.6, 196, 220, 261.6, 293.7, 349.2, 392, 440];
+  function musicTick() {
+    const ac = snd.ac; if (!ac || !snd.music || ac.state !== "running") return;
+    const eighth = 60 / 84 / 2;
+    while (snd.next < ac.currentTime + .4) {
+      const w = snd.next - ac.currentTime, st = snd.step % 16, M = snd.mus;
+      if (st === 0 || st === 3 || st === 6 || st === 10) { tone(st === 0 ? 72 : 88, .35, "sine", st === 0 ? .5 : .3, w, .55, M); noise(.06, .08, 700, "lowpass", w, M); }   // frame drum
+      if (st === 8) noise(.08, .05, 2500, "bandpass", w, M);
+      if (snd.step % 32 === 0) { tone(73.4, eighth * 32, "sawtooth", .035, w, 0, M); tone(110, eighth * 32, "sawtooth", .025, w, 0, M); }   // drone (D + A)
+      if (st % 2 === 0 && Math.random() < .55) {   // lyre: wanders the scale
+        snd.note = clamp(snd.note + ((Math.random() * 5) | 0) - 2, 0, SCALE.length - 1);
+        const f = SCALE[snd.note] * (SEASON === "christmas" && Math.random() < .3 ? 2 : 1);
+        tone(f, .9, "triangle", .07, w, 0, M); tone(f * 2, .4, "sine", .02, w, 0, M); }
+      if (SEASON === "halloween" && st === 12 && Math.random() < .25) tone(SCALE[0] * 1.414, 1.4, "sine", .03, w, .97, M);   // eerie tritone
+      snd.next += eighth; snd.step++;
+    }
+  }
+  function paintSnd() { $("sfxBtn").textContent = snd.on ? "🔊" : "🔇"; $("musBtn").style.opacity = snd.music ? 1 : .4; $("musBtn").title = snd.music ? "Music on" : "Music off"; $("sfxBtn").title = snd.on ? "Sound effects on" : "Sound effects off"; }
+  $("sfxBtn").onclick = () => { audioInit(); snd.on = !snd.on; store.set("ls_sfx", snd.on ? "1" : "0"); if (snd.sfx) snd.sfx.gain.value = snd.on ? 1 : 0; paintSnd(); sfx.click(); };
+  $("musBtn").onclick = () => { audioInit(); snd.music = !snd.music; store.set("ls_music", snd.music ? "1" : "0"); if (snd.mus) snd.mus.gain.setTargetAtTime(snd.music ? .55 : 0, snd.ac.currentTime, .1); if (snd.music && snd.ac) snd.next = snd.ac.currentTime + .05; paintSnd(); };
+  paintSnd();
+
   /* ===================== world ===================== */
   function makeIsles() {
     isles = [];
@@ -407,6 +500,7 @@ body.shorts #recHint{display:block}
     setupWorld(); player = makeShip(nm, "player"); ships.push(player);
     cam.x = player.x; cam.y = player.y; cam.z = 1; running = true;
     $("start").classList.add("hidden"); $("over").classList.add("hidden"); stopBoard();
+    audioInit(); sfx.start();
     if (TH) toast(TH.toast[0], TH.toast[1]); else toast("⛵ Set sail!", "Gather gold. Avoid shields and rocks.");
   }
   function setupWorld() {
@@ -425,12 +519,14 @@ body.shorts #recHint{display:block}
   }
   function sink(s, by, how) {
     if (!s.alive) return;
-    if (s.ward > 0 && how !== "bolt") { s.ward = 0; delete s.buffs.ward; s.invuln = 90; if (s.isPlayer) toast("🛡️ Thor's Ward saved you!"); return; }
+    if (s.ward > 0 && how !== "bolt") { s.ward = 0; delete s.buffs.ward; s.invuln = 90; if (s.isPlayer) { toast("🛡️ Thor's Ward saved you!"); sfx.clang(); } return; }
     s.alive = false;
     dropPlunder(s);
     if (by) { by.kills++;
       if (by.isPlayer) { prof.stats.sinks++; if (s.kind === "rogue") achieve("rogue"); if (s.boss && TH) { achieve(TH.boss.ach); setTimeout(() => toast(`🏆 You sank ${s.name}!`, "Its treasure is yours"), 300); } if (by.kills >= 5) achieve("kills5"); if (prof.stats.sinks >= 25) achieve("sinks25"); saveProf(); } }
+    if (by && by.isPlayer && !s.isPlayer) sfx.horn();
     if (s.isPlayer) {
+      sfx.sunk(); sfx.boost(false); lastRun = { score: s.peak || s.len, kills: s.kills, skin: s.skin, fig: s.fig, trail: s.trail };
       running = false; const best = Math.max(+store.get("ls_best") || 0, s.peak || s.len); store.set("ls_best", best);
       const earned = (s.peak || s.len) + s.kills * 25; prof.plunder += earned; prof.stats.runs++; if (prof.stats.runs >= 10) achieve("runs10");
       if (TH) { prof.stats[TH.runsKey] = (prof.stats[TH.runsKey] || 0) + 1; if (prof.stats[TH.runsKey] >= 3) achieve(TH.runsAch); } saveProf(); showPlunder();
@@ -536,7 +632,7 @@ body.shorts #recHint{display:block}
       for (const o of ships) { if (o === s || !o.alive) continue; const dd = d2(o.x, o.y, s.x, s.y); if (dd < 900 * 900 && dd < best) { best = dd; tgt = o; } }
       if (tgt) { bolts.push({ x1: s.x, y1: s.y, x2: tgt.x, y2: tgt.y, t: 30 }); sink(tgt, s, "bolt"); if (s.isPlayer) achieve("mjolnir"); }
     } else s.buffs[p.id] = { t: p.dur * 60, max: p.dur * 60 };
-    if (s.isPlayer) toast(`${p.icon} ${p.name}!`, p.note);
+    if (s.isPlayer) { toast(`${p.icon} ${p.name}!`, p.note); if (p.id === "mjolnir") sfx.thunder(); else sfx.power(p.r); }
   }
   let toastT = 0;
   let canvasToast = null;
@@ -551,6 +647,7 @@ body.shorts #recHint{display:block}
       if (kx || ky) { input.x = kx; input.y = ky; input.active = true; }
       if (input.active) player.target = Math.atan2(input.y, input.x);
       player.boosting = input.boost;
+      sfx.boost((player.boosting && player.len > BASE_LEN) || !!player.buffs.oars);
     }
     // grids
     gridClear(segGrid, segUsed); gridClear(goldGrid, goldUsed);
@@ -579,7 +676,7 @@ body.shorts #recHint{display:block}
       gridNear(goldGrid, s.x, s.y, Math.max(r, pull), g => {
         if (g.eaten) return; const dd = d2(g.x, g.y, s.x, s.y);
         if (pull && dd < pull * pull) { const d = Math.sqrt(dd) || 1; g.x += (s.x - g.x) / d * 3 * f; g.y += (s.y - g.y) / d * 3 * f; }
-        if (dd < r * r) { g.eaten = true; s.score += g.v * mult; while (s.score >= 3) { s.score -= 3; s.len++; }
+        if (dd < r * r) { g.eaten = true; s.score += g.v * mult; if (s.isPlayer) sfx.coin(g.v); while (s.score >= 3) { s.score -= 3; s.len++; }
           if (TH && s.isPlayer) { s.treats = (s.treats || 0) + 1; if (s.treats === 150) achieve(TH.treatAch); } }
       });
       for (let i = powers.length - 1; i >= 0; i--) { const p = powers[i]; if (d2(p.x, p.y, s.x, s.y) < (r + 16) ** 2) { powers.splice(i, 1); grant(s, p.p); } }
@@ -599,7 +696,7 @@ body.shorts #recHint{display:block}
     warnIsle = null;
     if (player && player.alive) { const pr = radius(player), hx = player.x + Math.cos(player.a) * pr * 1.2, hy = player.y + Math.sin(player.a) * pr * 1.2, rs = pr * .55;
       gridNear(segGrid, hx, hy, 130, v => { if (v.s === player || v.i === 0 || !v.s.alive || v.s.buffs.ghost) return;
-        const lim = radius(v.s) * .78 + rs + 55; if (d2(hx, hy, v.x, v.y) < lim * lim) v.warn = tick; });
+        const lim = radius(v.s) * .78 + rs + 55; if (d2(hx, hy, v.x, v.y) < lim * lim) { v.warn = tick; sfx.warn(); } });
       warnIsle = hitIsle(hx, hy, 45); }
     if (gold.length < GOLD_TARGET) spawnGold(Math.min(20, GOLD_TARGET - gold.length));
     for (let i = powers.length - 1; i >= 0; i--) if ((powers[i].life -= f) <= 0) powers.splice(i, 1);
@@ -1230,7 +1327,8 @@ body.shorts #recHint{display:block}
   async function postScore(s) {
     if (!POST_OK || (s.peak || s.len) < 10) return;
     const db = await fbReady(); if (!db) return;
-    const day = dayKey(), doc = { name: cleanName(s.name), score: s.peak || s.len, kills: s.kills, day, skin: s.skin.id || "fjord", ts: firebase.firestore.FieldValue.serverTimestamp() };
+    const day = dayKey(), rid = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);   // rid links this run's Today + All-time entries
+    const doc = { name: cleanName(s.name), score: s.peak || s.len, kills: s.kills, day, skin: s.skin.id || "fjord", rid, ts: firebase.firestore.FieldValue.serverTimestamp() };
     try {
       const a = await db.collection("scores").add(doc); const b = await db.collection("daily").doc(day).collection("scores").add(doc);
       lb.mine.add(a.id); lb.mine.add(b.id); store.set("ls_mine", JSON.stringify([...lb.mine].slice(-60)));
@@ -1240,7 +1338,7 @@ body.shorts #recHint{display:block}
   function boardEls() { return document.querySelectorAll("[data-lblist]"); }
   function paintBoard(rows, note) {
     boardEls().forEach(el => {
-      el.innerHTML = note ? `<li class="lbnote">${note}</li>` : rows.map((r, i) => `<li class="${lb.mine.has(r.id) ? "mine" : ""}"><span class="rk">${["🥇", "🥈", "🥉"][i] || i + 1}</span><span class="nm">${r.name.replace(/[<&]/g, "")}</span><span class="sc">${r.score}${r.kills ? ` <i>⚔️${r.kills}</i>` : ""}</span></li>`).join("");
+      el.innerHTML = note ? `<li class="lbnote">${note}</li>` : rows.map((r, i) => `<li class="${lb.mine.has(r.id) ? "mine" : ""}"><span class="rk">${["🥇", "🥈", "🥉"][i] || i + 1}</span><span class="nm">${String(r.name).replace(/[<&]/g, "")}</span><span class="sc">${r.score}${r.kills ? ` <i>⚔️${r.kills}</i>` : ""}</span>${acct.admin ? `<button class="del" data-del="${i}">🗑</button>` : ""}</li>`).join("");
     });
   }
   async function watchBoard() {
@@ -1250,10 +1348,23 @@ body.shorts #recHint{display:block}
     const db = await fbReady(); if (!db) { paintBoard([], "Couldn't reach the scoreboard right now."); return; }
     const q = (lb.tab === "today" ? db.collection("daily").doc(dayKey()).collection("scores") : db.collection("scores")).orderBy("score", "desc").limit(10);
     lb.unsub = q.onSnapshot(snap => {   // live: new scores pop in while you're looking
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const rows = lb.rows = snap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
       paintBoard(rows, rows.length ? "" : lb.tab === "today" ? "No scores yet today. Set sail and claim #1!" : "No scores yet. Be the first legend!");
     }, () => paintBoard([], "Couldn't reach the scoreboard right now."));
   }
+  // owner tools: a signed-in admin sees 🗑 on each row. Tap once to arm, again to delete the run from Today AND All-time.
+  document.addEventListener("click", async e => {
+    const b = e.target.closest("[data-del]"); if (!b || !acct.admin) return;
+    if (!b.classList.contains("sure")) { b.classList.add("sure"); b.textContent = "Delete?"; setTimeout(() => { b.classList.remove("sure"); b.textContent = "🗑"; }, 3000); return; }
+    const row = lb.rows && lb.rows[+b.dataset.del]; if (!row) return;
+    try {
+      if (row.rid) {
+        const hits = [...(await lb.db.collection("scores").where("rid", "==", row.rid).get()).docs, ...(await lb.db.collection("daily").doc(row.day).collection("scores").where("rid", "==", row.rid).get()).docs];
+        await Promise.all(hits.map(d => d.ref.delete()));
+      } else await row.ref.delete();
+      toast("🗑 Removed from the board");
+    } catch (err) { toast("Couldn't delete", "Check the admins setup in Firebase"); }
+  });
   function stopBoard() { if (lb.unsub) { lb.unsub(); lb.unsub = null; } }
   document.querySelectorAll("[data-lbtab]").forEach(b => b.onclick = () => { lb.tab = b.dataset.lbtab;
     document.querySelectorAll("[data-lbtab]").forEach(x => x.classList.toggle("on", x.dataset.lbtab === lb.tab)); watchBoard(); });
@@ -1261,7 +1372,7 @@ body.shorts #recHint{display:block}
   /* ===================== sign-in + cloud save =====================
      Sign in with Google and your plunder, skins, figureheads, trails and feats are saved to your account,
      so clearing the browser, switching phones or a new season never loses them. Uses the same Firebase project as the scoreboard. */
-  const acct = { user: null, t: 0 };
+  const acct = { user: null, t: 0, admin: false };
   function mergeCloud(c) {
     if (!c) return;
     prof.owned = [...new Set([...(c.owned || []), ...prof.owned])];
@@ -1276,7 +1387,7 @@ body.shorts #recHint{display:block}
   function paintAcct() {
     const el = $("acct"); if (!el) return;
     if (!FIREBASE_CONFIG) { el.innerHTML = `<small>Your skins are saved on this device.</small>`; return; }
-    el.innerHTML = acct.user ? `<small>☁️ Saved to <b>${(acct.user.displayName || acct.user.email || "your account").replace(/[<&]/g, "")}</b> · <a href="#" id="signOut">Sign out</a></small>`
+    el.innerHTML = acct.user ? `<small>${acct.admin ? "🛠 Admin · " : ""}☁️ Saved to <b>${(acct.user.displayName || acct.user.email || "your account").replace(/[<&]/g, "")}</b> · <a href="#" id="signOut">Sign out</a></small>`
       : `<button class="btn2" id="signIn">🔐 Sign in to save your skins</button><small>Keep everything you unlock, on any phone or computer.</small>`;
     const si = $("signIn"), so = $("signOut");
     if (si) si.onclick = signIn;
@@ -1292,14 +1403,53 @@ body.shorts #recHint{display:block}
     paintAcct(); if (!FIREBASE_CONFIG) return;
     fbReady().then(db => { if (!db) return;
       firebase.auth().onAuthStateChanged(async u => {
-        acct.user = u;
-        if (u) { try { const d = await db.collection("users").doc(u.uid).get(); mergeCloud(d.exists ? d.data() : null); } catch (e) {}
+        acct.user = u; acct.admin = false;
+        if (u) { try { acct.admin = (await db.collection("admins").doc(u.uid).get()).exists; } catch (e) {}
+          if (acct.admin && lb.unsub) watchBoard(); try { const d = await db.collection("users").doc(u.uid).get(); mergeCloud(d.exists ? d.data() : null); } catch (e) {}
           store.set("ls_profile", JSON.stringify(prof)); cloudSave(); showPlunder(); if (!$("ward").classList.contains("hidden")) renderWard();
           if (!$("name").value && u.displayName) $("name").value = u.displayName.split(" ")[0].slice(0, 14); }
         paintAcct();
       });
     });
   }
+
+  /* ===================== share my score =====================
+     Makes a square score card (your ship, your score, the link) and opens the phone's share sheet.
+     Computers without a share sheet copy the link and download the card instead. */
+  const GAME_URL = "https://busterrdust.com/games/longship/";
+  let lastRun = null;
+  function scoreCard(run) {
+    const S = 1080, c = document.createElement("canvas"); c.width = c.height = S; const x = c.getContext("2d");
+    const sea = x.createRadialGradient(S / 2, S * .45, 60, S / 2, S / 2, S * .75);
+    sea.addColorStop(0, TH ? TH.sea[0] : "#14506d"); sea.addColorStop(1, TH ? TH.sea[1] : "#06192a"); x.fillStyle = sea; x.fillRect(0, 0, S, S);
+    x.strokeStyle = "rgba(255,255,255,.06)"; x.lineWidth = 3; for (let k = 0; k < 40; k++) { const wx = (k * 233) % S, wy = (k * 397) % S; x.beginPath(); x.moveTo(wx, wy); x.quadraticCurveTo(wx + 20, wy - 8, wx + 40, wy); x.stroke(); }
+    x.textAlign = "center"; x.fillStyle = "#f3ead6"; x.font = "900 96px system-ui,sans-serif"; x.shadowColor = "#000a"; x.shadowBlur = 18;
+    const t1 = "LONG", t2 = "SHIP", t3 = ".io", w1 = x.measureText(t1).width, w2 = x.measureText(t2).width, w3 = x.measureText(t3).width, x0 = S / 2 - (w1 + w2 + w3) / 2;
+    x.textAlign = "left"; x.fillText(t1, x0, 150); x.fillStyle = "#e7b54a"; x.fillText(t2, x0 + w1, 150); x.fillStyle = "#f3ead6"; x.fillText(t3, x0 + w1 + w2, 150);
+    x.textAlign = "center"; if (TH) { x.font = "800 38px system-ui,sans-serif"; x.fillStyle = SEASON === "halloween" ? "#ff8c1a" : "#ff6b6b"; x.fillText(TH.tag, S / 2, 210); }
+    // the player's own ship, big
+    const r = 46, segs = []; for (let i = 0; i < 9; i++) segs.push({ x: S * .64 - i * r * 1.02, y: S * .47 + Math.sin(i * .6) * 26, warn: -99 });
+    const a = Math.atan2(segs[0].y - segs[1].y, segs[0].x - segs[1].x); x.shadowBlur = 0;
+    drawShipBody(x, run.skin, run.fig, segs, r, a, { boosting: false, rogue: false, warned: null, trail: run.trail });
+    x.shadowBlur = 18; x.fillStyle = "#fff"; x.font = "900 150px system-ui,sans-serif"; x.fillText(run.score, S / 2, S * .76);
+    x.font = "700 44px system-ui,sans-serif"; x.fillStyle = "#f3ead6"; x.fillText(`shield wall${run.kills ? `  ·  ⚔️ ${run.kills} sunk` : ""}`, S / 2, S * .76 + 60);
+    x.font = "800 46px system-ui,sans-serif"; x.fillStyle = "#e7b54a"; x.fillText("Can you beat me?", S / 2, S * .9);
+    x.font = "600 36px system-ui,sans-serif"; x.fillStyle = "#f3ead6"; x.fillText("busterrdust.com/games", S / 2, S * .9 + 52);
+    return c;
+  }
+  async function shareScore() {
+    if (!lastRun) return; sfx.click();
+    const text = `I built a ${lastRun.score}-shield wall in Longship.io${lastRun.kills ? ` and sank ${lastRun.kills} raider${lastRun.kills > 1 ? "s" : ""}` : ""}! Can you beat me? ⛵`;
+    const blob = await new Promise(ok => scoreCard(lastRun).toBlob(ok, "image/png"));
+    const file = blob && new File([blob], "longship-score.png", { type: "image/png" });
+    try {
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: text + " " + GAME_URL, title: "Longship.io" }); return; }
+      if (navigator.share) { await navigator.share({ text, url: GAME_URL, title: "Longship.io" }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(text + " " + GAME_URL); toast("🔗 Link copied!", "Your score card is downloading too"); } catch (e) { toast("📸 Score card saved", GAME_URL); }
+    if (blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "longship-score.png"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); }
+  }
+  $("shareBtn").onclick = shareScore;
 
   let last = performance.now();
   function frame(now) {
@@ -1371,9 +1521,9 @@ body.shorts #recHint{display:block}
   const SLOT = { ships: "skin", figs: "fig", trails: "trail" }, TAB_LIST = { ships: SKINS, figs: FIGS, trails: TRAILS };
   $("wardGrid").addEventListener("click", e => {
     const eq = e.target.closest("[data-eq]"), buy = e.target.closest("[data-buy]");
-    if (eq) { prof.eq[SLOT[wtab]] = eq.dataset.eq; saveProf(); renderWard(); }
+    if (eq) { prof.eq[SLOT[wtab]] = eq.dataset.eq; saveProf(); renderWard(); sfx.click(); }
     if (buy) { const it = TAB_LIST[wtab].find(x => x.id === buy.dataset.buy); if (it && prof.plunder >= it.un.cost && !prof.owned.includes(it.id)) {
-      prof.plunder -= it.un.cost; prof.owned.push(it.id); prof.eq[SLOT[wtab]] = it.id; saveProf(); renderWard(); } }
+      prof.plunder -= it.un.cost; prof.owned.push(it.id); prof.eq[SLOT[wtab]] = it.id; saveProf(); renderWard(); sfx.buy(); } }
   });
   document.querySelectorAll("#ward [data-tab]").forEach(b => b.onclick = () => { wtab = b.dataset.tab;
     document.querySelectorAll("#ward [data-tab]").forEach(x => x.classList.toggle("on", x === b)); renderWard(); });
