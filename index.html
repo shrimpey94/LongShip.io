@@ -1384,10 +1384,13 @@ body.shorts #sndBar{display:none}
     if (!acct.user || !lb.db) return; clearTimeout(acct.t);
     acct.t = setTimeout(() => lb.db.collection("users").doc(acct.user.uid).set({ plunder: prof.plunder, owned: prof.owned, ach: prof.ach, eq: prof.eq, stats: prof.stats, t: prof.t || Date.now() }).catch(e => console.warn("cloud save failed", e)), 1200);
   }
+  // TikTok / Facebook / Instagram open links in their own mini browser, where Google blocks sign-in. Playing and scores still work there.
+  const IN_APP = /TikTok|musical_ly|Bytedance|BytedanceWebview|FBAN|FBAV|FB_IAB|Instagram|Snapchat|Line\//i.test(navigator.userAgent);
   function paintAcct() {
     const el = $("acct"); if (!el) return;
     if (!FIREBASE_CONFIG) { el.innerHTML = `<small>Your skins are saved on this device.</small>`; return; }
     el.innerHTML = acct.user ? `<small>${acct.admin ? "🛠 Admin · " : ""}☁️ Saved to <b>${(acct.user.displayName || acct.user.email || "your account").replace(/[<&]/g, "")}</b> · <a href="#" id="signOut">Sign out</a></small>`
+      : IN_APP ? `<small>🔐 To sign in and save your skins, tap <b>•••</b> (or ⋮) at the top and choose <b>Open in browser</b>. You can play and post scores right here.</small>`
       : `<button class="btn2" id="signIn">🔐 Sign in to save your skins</button><small>Keep everything you unlock, on any phone or computer.</small>`;
     const si = $("signIn"), so = $("signOut");
     if (si) si.onclick = signIn;
