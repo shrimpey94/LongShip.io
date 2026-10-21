@@ -393,6 +393,7 @@ body.shorts #sndBar{display:none}
       sink: (s, by, how) => { if (s === player) onPlayerSunk({ by: by ? by.name : null, how, peak: s.peak || s.len, kills: s.kills }); else if (by === player) onKill(s); },
       ward: s => { if (s === player) onWardSave(); },
       grant: (s, p, hit) => { if (s === player) onGrant(p, hit); },
+      struck: (v, by, lost) => { if (v === player) onStruck(by ? by.name : null, lost); },
       eat: (s, g) => { if (s === player) onEat(g.v); },
       returned: n => toast(`${n.name} has returned...`),
     } });
@@ -401,6 +402,7 @@ body.shorts #sndBar{display:none}
 
   /* ----- what happens to YOU (the same in bots-only mode and in a real lobby) ----- */
   function onEat(v) { sfx.coin(v); if (TH && player) { player.treats = (player.treats || 0) + 1; if (player.treats === 150) achieve(TH.treatAch); } }
+  function onStruck(by, lost) { toast("⚡ Struck by lightning!", `${by ? String(by).replace(/[<&]/g, "") + " shattered" : "Lost"} ${lost} of your shields`); sfx.thunder(); }
   function onWardSave() { toast("🛡️ Thor's Ward saved you!"); sfx.clang(); }
   function onGrant(p, hit) { toast(`${p.icon} ${p.name}!`, p.note); if (p.id === "mjolnir") { sfx.thunder(); if (hit) achieve("mjolnir"); } else sfx.power(p.r); }
   function onKill(v) {   // v: the ship you sank (name, kind, boss)
@@ -576,6 +578,7 @@ body.shorts #sndBar{display:none}
       case "sunk": onPlayerSunk(e); net.sailing = false; break;
       case "kill": onKill(e); break;
       case "ward": onWardSave(); break;
+      case "struck": onStruck(e.by, e.lost); break;
       case "grant": onGrant(Sim.POWERS[e.p], e.hit); break;
       case "eat": for (const v of e.v) onEat(v); break;
       case "returned": toast(`${e.name} has returned...`); break;

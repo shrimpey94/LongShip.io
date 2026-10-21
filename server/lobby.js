@@ -49,6 +49,7 @@ export class Lobby {
         if (by && by.conn) L.ev(by.conn, { k: "kill", name: s.name, kind: s.kind, boss: !!s.boss });
       },
       ward: s => { if (s.conn) L.ev(s.conn, { k: "ward" }); },
+      struck: (v, by, lost) => { if (v.conn) L.ev(v.conn, { k: "struck", by: by ? by.name : null, lost }); },
       grant: (s, p, hit) => { if (s.conn) L.ev(s.conn, { k: "grant", p: POWER_IDX[p.id], hit: !!hit }); },
       eat: (s, g, mult) => { if (s.conn) (s.conn.eat || (s.conn.eat = [])).push(g.v * mult); },
       returned: n => { for (const c of L.conns) L.ev(c, { k: "returned", name: n.name }); },

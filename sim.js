@@ -18,7 +18,7 @@
     { id: "ward",   icon: "🛡️", name: "Thor's Ward",    r: 1, w: 13, dur: 20, note: "Survive one crash" },
     { id: "ghost",  icon: "👻", name: "Ghost Ship",     r: 2, w: 7,  dur: 7,  note: "Sail through ships" },
     { id: "mead",   icon: "🍺", name: "Mead of Plenty", r: 2, w: 6,  dur: 15, note: "Gold counts double" },
-    { id: "mjolnir",icon: "⚡", name: "Mjölnir",        r: 3, w: 3,  dur: 0,  note: "Lightning sinks the nearest rival" },
+    { id: "mjolnir",icon: "⚡", name: "Mjölnir",        r: 3, w: 3,  dur: 0,  note: "Lightning shatters the nearest rival's shield wall" },
   ];
   // loot drifting at sea (value = how much it grows you; 3 value = 1 shield)
   const LOOT = { coin: { v: 1, w: 80 }, silver: { v: 2, w: 9 }, amber: { v: 3, w: 5 }, gem: { v: 5, w: 3.5 }, goblet: { v: 8, w: 1.6 }, horn: { v: 12, w: .7 }, chest: { v: 25, w: 0 } };
@@ -97,7 +97,7 @@
   const MAX_SPEED = BOOST * 1.15;   // fastest legal speed (px per frame), for checking players' reported moves
 
   /* ===================== the world ===================== */
-  // opts: { season, bots, track (server: record changes to send), hooks: { add(s), remove(s), sink(s, by, how), ward(s), grant(s, p, hit), eat(s, g, mult), returned(s), fix(s) } }
+  // opts: { season, bots, track (server: record changes to send), hooks: { add(s), remove(s), sink(s, by, how), ward(s), grant(s, p, hit), struck(victim, by, lost), eat(s, g, mult), returned(s), fix(s) } }
   function World(opts) {
     opts = opts || {};
     this.season = opts.season || null; this.S = this.season ? SEASONS[this.season] : null;
@@ -164,10 +164,12 @@
     this.gold.push(g); if (this.track) this.goldAdded.push(g); return g;
   };
   // a sunk ship spills its plunder along its hull: bigger ships leave bigger piles with chests and treasure
-  P.dropPlunder = function (s) {
-    let total = Math.round(s.len * 3 * .8), i = 0;
-    const segs = s.segs.length ? s.segs : [{ x: s.x, y: s.y }];
-    const chests = Math.floor(s.len / 45);
+  P.dropPlunder = function (s) { this.spill(s.segs.length ? s.segs : [{ x: s.x, y: s.y }], Math.round(s.len * 3 * .8)); };
+  // scatter loot worth `total` along a run of shield positions (chests for big piles)
+  P.spill = function (segs, total) {
+    if (!segs.length || total <= 0) return;
+    let i = 0;
+    const chests = Math.floor(total / 108);
     for (let c = 0; c < chests && total >= 25; c++) { const p = segs[Math.floor(Math.random() * segs.length)];
       if (!this.inIsle(p.x, p.y, 10)) { this.addLoot("chest", p.x + rnd(-10, 10), p.y + rnd(-10, 10), 1); total -= 25; } }
     const order = ["horn", "goblet", "gem", "amber", "silver", "coin"];
@@ -306,9 +308,18 @@
     if (p.id === "feast") s.len += 12;
     else if (p.id === "ward") { s.ward = 1; s.buffs.ward = { t: p.dur * 60, max: p.dur * 60 }; }
     else if (p.id === "mjolnir") {
+      // lightning strikes the nearest rival within 600px: small ships (under 20 shields) sink,
+      // bigger ships lose the back half of their shield wall, which spills into the sea as loot
       let tgt = null, best = 1e9;
-      for (const o of this.ships) { if (o === s || !o.alive) continue; const dd = d2(o.x, o.y, s.x, s.y); if (dd < 900 * 900 && dd < best) { best = dd; tgt = o; } }
-      if (tgt) { const b = { x1: s.x, y1: s.y, x2: tgt.x, y2: tgt.y, t: 30 }; this.bolts.push(b); if (this.track) this.newBolts.push(b); hit = tgt; this.sink(tgt, s, "bolt"); }
+      for (const o of this.ships) { if (o === s || !o.alive) continue; const dd = d2(o.x, o.y, s.x, s.y); if (dd < 600 * 600 && dd < best) { best = dd; tgt = o; } }
+      if (tgt) {
+        const mid = tgt.segs[Math.floor(tgt.segs.length / 2)] || tgt;
+        const b = { x1: s.x, y1: s.y, x2: mid.x, y2: mid.y, t: 30 }; this.bolts.push(b); if (this.track) this.newBolts.push(b); hit = tgt;
+        if (tgt.len < 20) this.sink(tgt, s, "bolt");
+        else { const keep = Math.ceil(tgt.len / 2), lost = tgt.len - keep;
+          this.spill(tgt.segs.slice(keep), Math.round(lost * 3 * .8)); tgt.len = keep; buildSegs(tgt);
+          if (this.h.struck) this.h.struck(tgt, s, lost); }
+      }
     } else s.buffs[p.id] = { t: p.dur * 60, max: p.dur * 60 };
     if (this.h.grant) this.h.grant(s, p, hit);
   };
