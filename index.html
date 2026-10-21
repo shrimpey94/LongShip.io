@@ -613,6 +613,10 @@ body.shorts #sndBar{display:none}
     }
     for (const g of gold) if (g.glow) g.glow = Math.max(0, g.glow - f);
     for (let i = bolts.length - 1; i >= 0; i--) if ((bolts[i].t -= f) <= 0) bolts.splice(i, 1);
+    // Odin's Pull: the server pulls the real gold toward magnet ships; draw the same drift here so you see it fly in
+    for (const s of ships) { if (!s.alive || s.hidden || !s.buffs.magnet) continue;
+      for (const g of gold) { const dx = s.x - g.x, dy = s.y - g.y; if (Math.abs(dx) > 190 || Math.abs(dy) > 190) continue;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1; if (d < 190) { g.x += dx / d * 3 * f; g.y += dy / d * 3 * f; } } }
     // 15 updates a second: where you are (if sailing) and what part of the sea you're looking at
     if (now - net.lastSend > 66 && net.ws && net.ws.readyState === 1) {
       net.lastSend = now;
@@ -777,29 +781,30 @@ body.shorts #sndBar{display:none}
   }
   // power-ups: carved runestones, painted once each; the rarity glow animates on top
   const powerCache = new Map();
+  // power-ups: round rune badges with a big icon, so you can tell what each one is at a glance (even on a phone)
   function powerSprite(p) {
     let c = powerCache.get(p.id); if (c) return c;
-    c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"); x.scale(2, 2); x.translate(32, 32);
+    c = document.createElement("canvas"); c.width = c.height = 160; const x = c.getContext("2d"); x.scale(2, 2); x.translate(40, 40);
     const col = RCOL[p.r];
-    x.fillStyle = "rgba(0,0,0,.35)"; x.beginPath(); x.ellipse(2, 19, 15, 5, 0, 0, 7); x.fill();
-    const stone = () => { x.beginPath(); x.moveTo(-14, 18); x.lineTo(-15, -4); x.quadraticCurveTo(-15, -20, 0, -21); x.quadraticCurveTo(15, -20, 15, -4); x.lineTo(14, 18); x.closePath(); };
-    const g = x.createLinearGradient(-15, -21, 15, 18); g.addColorStop(0, "#8d949c"); g.addColorStop(.5, "#5d646c"); g.addColorStop(1, "#343940");
-    x.fillStyle = g; stone(); x.fill(); x.lineWidth = 3; x.strokeStyle = col; x.stroke();
-    x.lineWidth = 1; x.strokeStyle = "rgba(255,255,255,.25)"; x.beginPath(); x.moveTo(-12, 15); x.lineTo(-12.5, -4); x.quadraticCurveTo(-12.5, -17, 0, -18); x.stroke();   // carved edge highlight
-    x.strokeStyle = col + "aa"; x.lineWidth = 1.2; x.beginPath(); for (let k = 0; k < 3; k++) { x.moveTo(-9 + k * 9, 12); x.lineTo(-7 + k * 9, 16); x.lineTo(-5 + k * 9, 12); } x.stroke();   // little runes
-    x.font = "17px system-ui"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(p.icon, 0, -2);
+    x.fillStyle = "rgba(0,0,0,.35)"; x.beginPath(); x.ellipse(2, 26, 20, 6, 0, 0, 7); x.fill();   // shadow on the water
+    const g = x.createRadialGradient(-6, -8, 2, 0, 0, 24); g.addColorStop(0, "#3c4652"); g.addColorStop(1, "#151a21");
+    x.fillStyle = g; x.beginPath(); x.arc(0, 0, 22, 0, 7); x.fill();                       // dark stone disc
+    x.lineWidth = 4.5; x.strokeStyle = col; x.stroke();                                     // rarity ring
+    x.lineWidth = 1.2; x.strokeStyle = "rgba(255,255,255,.35)"; x.beginPath(); x.arc(0, 0, 18, 0, 7); x.stroke();
+    x.fillStyle = col; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; x.save(); x.translate(Math.cos(a) * 26.5, Math.sin(a) * 26.5); x.rotate(a); x.fillRect(-1.2, -2.5, 2.4, 5); x.restore(); }   // rune notches
+    x.font = "26px system-ui, 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji'"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(p.icon, 0, 1.5);
     powerCache.set(p.id, c); return c;
   }
   function drawPowers() {
     for (const p of powers) { if (!onScreen(p.x, p.y, 50)) continue;
       const bob = Math.sin(tick * .05 + p.t) * 3, c = RCOL[p.p.r], fade = p.life < 300 ? (Math.sin(tick * .3) > 0 ? 1 : .35) : 1, y = p.y + bob;
       ctx.globalAlpha = fade;
-      ctx.drawImage(haloSprite(c), p.x - 34, y - 34, 68, 68);
+      ctx.drawImage(haloSprite(c), p.x - 44, y - 44, 88, 88);
       ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.globalAlpha = fade * (.45 + .3 * Math.sin(tick * .08 + p.t));
-      ctx.beginPath(); ctx.arc(p.x, y, 25 + Math.sin(tick * .08 + p.t) * 3, 0, 7); ctx.stroke();
-      if (p.p.r >= 2) { ctx.setLineDash([6, 8]); ctx.lineDashOffset = -tick * .6; ctx.beginPath(); ctx.arc(p.x, y, 31, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
-      if (p.p.r >= 3) { ctx.fillStyle = "#fff3b0"; for (let k = 0; k < 4; k++) { const a = tick * .04 + k * 1.571; ctx.beginPath(); ctx.arc(p.x + Math.cos(a) * 34, y + Math.sin(a) * 34, 2.2, 0, 7); ctx.fill(); } }
-      ctx.globalAlpha = fade; ctx.drawImage(powerSprite(p.p), p.x - 32, y - 32, 64, 64);
+      ctx.beginPath(); ctx.arc(p.x, y, 32 + Math.sin(tick * .08 + p.t) * 3, 0, 7); ctx.stroke();
+      if (p.p.r >= 2) { ctx.setLineDash([6, 8]); ctx.lineDashOffset = -tick * .6; ctx.beginPath(); ctx.arc(p.x, y, 38, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      if (p.p.r >= 3) { ctx.fillStyle = "#fff3b0"; for (let k = 0; k < 4; k++) { const a = tick * .04 + k * 1.571; ctx.beginPath(); ctx.arc(p.x + Math.cos(a) * 42, y + Math.sin(a) * 42, 2.4, 0, 7); ctx.fill(); } }
+      ctx.globalAlpha = fade; ctx.drawImage(powerSprite(p.p), p.x - 40, y - 40, 80, 80);
       ctx.globalAlpha = 1; }
   }
   /* ---------- wake trails: a small pooled particle system (no garbage, hard cap) ---------- */
