@@ -26,7 +26,7 @@ canvas{display:block;width:100vw;height:100vh}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast small{display:block;font:600 13px system-ui;opacity:.85}
 .screen{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,#0b2a3cd0,#06192af0)}
-.card{text-align:center;padding:24px;max-width:440px}
+.card{text-align:center;padding:24px;max-width:440px;max-height:100%;overflow:auto}
 .card h1{margin:0;font:900 clamp(2.2rem,9vw,3.4rem)/1 system-ui;letter-spacing:.02em}
 .card h1 span{color:var(--gold)}
 #seasonTag{display:none;margin:8px 0 0;font:800 18px system-ui;letter-spacing:.04em}
@@ -52,6 +52,17 @@ body.shorts #recHint{display:block}
 .legend span{white-space:nowrap}
 .r0{color:#d5d8dc}.r1{color:#58d68d}.r2{color:#5dade2}.r3{color:#f5b041}
 .hidden{display:none!important}
+.lb{margin:6px auto 4px;max-width:330px;background:#0007;border:1px solid #ffffff1f;border-radius:14px;padding:8px 10px;text-align:left}
+.lbtabs{display:flex;gap:6px;margin-bottom:6px}
+.lbtabs button,.card .lbtabs button{flex:1;margin:0;padding:6px;border-radius:999px;border:2px solid #ffffff22;background:transparent;color:var(--ink);font:700 13px system-ui;cursor:pointer}
+.lbtabs button.on,.card .lbtabs button.on{border-color:var(--gold);color:var(--gold)}
+.lb ol{list-style:none;margin:0;padding:0;font:600 14px/1.25 system-ui;max-height:300px;overflow:auto}
+.lb li{display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid #ffffff12}
+.lb li:last-child{border:0}
+.lb .rk{width:26px;text-align:center;opacity:.9}.lb .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lb .sc{color:var(--gold);font-weight:800}.lb .sc i{font-style:normal;opacity:.7;font-size:11px;margin-left:4px;color:var(--ink)}
+.lb li.mine{background:#e7b54a26;border-radius:8px}.lb li.mine .nm::after{content:" (you)";opacity:.7;font-size:11px}
+.lb .lbnote{display:block;opacity:.8;font-size:13px;line-height:1.4;text-align:center;padding:10px 4px}
+.skin .wk{display:block;font:600 11px system-ui;font-style:normal;color:var(--gold);opacity:.85}
 #boostBtn{position:fixed;left:16px;bottom:18px;width:76px;height:76px;border-radius:50%;border:2px solid #ffffff44;background:#0007;color:var(--gold);font:800 13px system-ui;display:none}
 @media (pointer:coarse){#boostBtn{display:block}}
 .btn2,.card .btn2{margin-top:10px;font:700 15px system-ui;padding:10px 20px;border-radius:999px;border:2px solid #ffffff33;background:#0006;color:var(--ink);cursor:pointer}
@@ -66,6 +77,7 @@ body.shorts #recHint{display:block}
 .skin{background:#0b2a3c;border:2px solid #ffffff1a;border-radius:12px;padding:8px;text-align:center;cursor:pointer;position:relative}
 .skin.eq{border-color:var(--gold)}
 .skin canvas{width:100%;height:auto;display:block;border-radius:8px;background:#124a66}
+.skin:not(.locked) canvas{box-shadow:inset 0 0 0 1px #ffffff14}
 .skin b{display:block;margin-top:6px;font-size:14px}
 .skin small{display:block;font-size:11.5px;opacity:.8;min-height:28px;line-height:1.25;margin-top:2px}
 .skin .tag{position:absolute;top:8px;right:8px;background:#000a;border-radius:999px;padding:2px 8px;font:700 11px system-ui}
@@ -102,11 +114,14 @@ body.shorts #recHint{display:block}
   </div>
   <small>Steer with the mouse, a finger drag, or WASD / arrow keys<br>Row hard: hold click, Space, or ROW! (costs shields)</small>
   <small id="bestLine"></small>
+  <button class="btn2" id="lbBtn">🏆 High scores</button>
+  <div id="startLb" class="hidden"><div class="lb"><div class="lbtabs"><button data-lbtab="today" class="on">Today</button><button data-lbtab="all">All-time</button></div><ol data-lblist></ol></div></div>
 </div></div>
 
 <div class="screen hidden" id="over"><div class="card">
   <h1>Sunk!</h1>
   <p id="overText"></p>
+  <div class="lb"><div class="lbtabs"><button data-lbtab="today" class="on">Today</button><button data-lbtab="all">All-time</button></div><ol data-lblist></ol></div>
   <button id="again">Sail again</button><br><button class="btn2" id="wardBtn2">🎨 Wardrobe · <span class="plunder" data-plunder></span> plunder</button>
   <small><a href="/games/" target="_top" style="color:var(--gold)">Back to Busterrdust Games</a> · <a href="/games/vikingvale" target="_blank" rel="noopener" style="color:var(--gold)">Play VikingVale</a></small>
 </div></div>
@@ -159,30 +174,34 @@ body.shorts #recHint{display:block}
   const LOOT = { coin: { v: 1, w: 80 }, silver: { v: 2, w: 9 }, amber: { v: 3, w: 5 }, gem: { v: 5, w: 3.5 }, goblet: { v: 8, w: 1.6 }, horn: { v: 12, w: .7 }, chest: { v: 25, w: 0 } };
   const LOOT_SPAWN = Object.entries(LOOT).filter(([, o]) => o.w > 0), LOOT_W = LOOT_SPAWN.reduce((a, [, o]) => a + o.w, 0);
   const GEM_HUES = [350, 140, 210, 280];
-  // ship skins: a/b = shield colors, sail = [cloth, stripes], pat = shield pattern
+  /* ship skins — every skin has its own full look:
+     a/b = shield colors · shape = shield shape · pat = shield pattern · hull = [outline, planks, trim]
+     sail = [cloth, stripe] · sailPat = stripe layout · emb = sail emblem · wake = trail behind the ship */
   const SKINS = [
-    { id: "fjord",   name: "Fjord Red",     a: "#c0392b", b: "#f5d76e", sail: ["#f5d76e", "#c0392b"], pat: "alt",    un: { t: "free" } },
-    { id: "glacier", name: "Glacier Blue",  a: "#2e86c1", b: "#f4f6f7", sail: ["#f4f6f7", "#2e86c1"], pat: "cross",  un: { t: "free" } },
-    { id: "forest",  name: "Forest Green",  a: "#27ae60", b: "#f9e79f", sail: ["#f9e79f", "#1e8449"], pat: "split",  un: { t: "free" } },
-    { id: "raven",   name: "Raven Black",   a: "#1c1c1c", b: "#7f8c8d", sail: ["#2c2c2c", "#bdc3c7"], pat: "alt",    un: { t: "buy", cost: 400 } },
-    { id: "frost",   name: "Frost Giant",   a: "#d6eaf8", b: "#85c1e9", sail: ["#ebf5fb", "#5dade2"], pat: "rings",  un: { t: "buy", cost: 900 } },
-    { id: "jarl",    name: "Golden Jarl",   a: "#d4ac0d", b: "#fdfefe", sail: ["#fdfefe", "#d4ac0d"], pat: "cross",  glow: "#f7dc6f", un: { t: "buy", cost: 1500 } },
-    { id: "aurora",  name: "Aurora",        a: "#58d68d", b: "#a569bd", sail: ["#1b2631", "#58d68d"], pat: "rainbow", un: { t: "buy", cost: 3000 } },
-    { id: "thunder", name: "Thunder God",   a: "#6c3483", b: "#f4d03f", sail: ["#4a235a", "#f4d03f"], pat: "bolt",   glow: "#d2b4de", un: { t: "ach", key: "mjolnir", label: "Strike a rival with ⚡ Mjölnir" } },
-    { id: "kraken",  name: "Kraken",        a: "#117a65", b: "#0b1f1a", sail: ["#0e3b33", "#48c9b0"], pat: "spiral", un: { t: "ach", key: "len150", label: "Grow a 150-shield wall" } },
-    { id: "blood",   name: "Bloodaxe",      a: "#7b241c", b: "#17202a", sail: ["#17202a", "#c0392b"], pat: "split",  un: { t: "ach", key: "kills5", label: "Sink 5 raiders in one voyage" } },
-    { id: "ember",   name: "Ember",         a: "#e67e22", b: "#922b21", sail: ["#922b21", "#f5b041"], pat: "flame",  un: { t: "ach", key: "runs10", label: "Sail 10 voyages" } },
-    { id: "valhalla",name: "Valhalla",      a: "#f7dc6f", b: "#fef9e7", sail: ["#fef9e7", "#f1c40f"], pat: "rings",  glow: "#fff3b0", un: { t: "ach", key: "top1", label: "Become the mightiest raider (#1)" } },
+    { id: "fjord",   name: "Fjord Raider",  a: "#c62828", b: "#ffd54f", shape: "round",  pat: "alt",    hull: ["#2b1608", "#7a4a22", "#c08a4e"], sail: ["#f6ecd4", "#c62828"], sailPat: "vstripe", emb: null,       wake: "foam",    un: { t: "free" } },
+    { id: "glacier", name: "Sea Wolf",      a: "#1e3a5f", b: "#e9eff6", shape: "round",  pat: "cross",  hull: ["#15171b", "#454c57", "#8a94a3"], sail: ["#1e3a5f", "#e9eff6"], sailPat: "hstripe", emb: "wolf",     embC: "#e9eff6", wake: "foam", un: { t: "free" } },
+    { id: "forest",  name: "Yggdrasil",     a: "#2e7d32", b: "#efe2b4", shape: "square", pat: "split",  hull: ["#24180b", "#5c4321", "#9c7a44"], sail: ["#efe2b4", "#2e7d32"], sailPat: "border",  emb: "tree",     embC: "#2e7d32", wake: "leaves", un: { t: "free" } },
+    { id: "raven",   name: "Raven Black",   a: "#151518", b: "#6e5bb5", shape: "kite",   pat: "alt",    hull: ["#060608", "#1f1f26", "#4b4a5c"], sail: ["#17171c", "#6e5bb5"], sailPat: "plain",   emb: "raven",    embC: "#b9a8ff", wake: "feather", un: { t: "buy", cost: 400 } },
+    { id: "frost",   name: "Frost Giant",   a: "#eaf7ff", b: "#6ec1f5", shape: "hex",    pat: "rings",  hull: ["#4d6375", "#a9c0d1", "#f2fbff"], sail: ["#f4fbff", "#6ec1f5"], sailPat: "diag",    emb: "flake",    embC: "#2f8fd8", wake: "frost",   un: { t: "buy", cost: 900 } },
+    { id: "jarl",    name: "Golden Jarl",   a: "#e8b90c", b: "#7a0f22", shape: "round",  pat: "cross",  hull: ["#2a0a05", "#6a2412", "#f2c94c"], sail: ["#7a0f22", "#e8b90c"], sailPat: "border",  emb: "crown",    embC: "#f2c94c", wake: "gold", glow: "#ffe066", un: { t: "buy", cost: 1500 } },
+    { id: "aurora",  name: "Aurora",        a: "#58d68d", b: "#a569bd", shape: "round",  pat: "rainbow",hull: ["#070d1a", "#15233f", "#58d68d"], sail: ["#0e1a33", "#58d68d"], sailPat: "aurora",  emb: "star",     embC: "#eafff4", wake: "aurora",  un: { t: "buy", cost: 3000 } },
+    { id: "thunder", name: "Thunder God",   a: "#4a1f73", b: "#ffd23f", shape: "square", pat: "bolt",   hull: ["#140a20", "#3b2157", "#ffd23f"], sail: ["#2a1245", "#ffd23f"], sailPat: "plain",   emb: "bolt",     embC: "#ffd23f", wake: "spark", glow: "#c9a7ff", un: { t: "ach", key: "mjolnir", label: "Strike a rival with ⚡ Mjölnir" } },
+    { id: "kraken",  name: "Kraken",        a: "#0f7a68", b: "#04241e", shape: "hex",    pat: "spiral", hull: ["#020e0b", "#0b3029", "#2bbf9f"], sail: ["#082a24", "#48c9b0"], sailPat: "plain",   emb: "tentacle", embC: "#5ff0cf", wake: "ink",     un: { t: "ach", key: "len150", label: "Grow a 150-shield wall" } },
+    { id: "blood",   name: "Bloodaxe",      a: "#9e0b1a", b: "#141414", shape: "kite",   pat: "split",  hull: ["#0c0303", "#2b0d0d", "#9e0b1a"], sail: ["#141414", "#b3001b"], sailPat: "diag",    emb: "axe",      embC: "#e8e8e8", wake: "crimson", un: { t: "ach", key: "kills5", label: "Sink 5 raiders in one voyage" } },
+    { id: "ember",   name: "Ember",         a: "#ff7b00", b: "#3a1a08", shape: "round",  pat: "flame",  hull: ["#0d0603", "#2e1a0e", "#ff8c1a"], sail: ["#2a1407", "#ff9a1f"], sailPat: "plain",   emb: "flame",    embC: "#ffb21f", wake: "embers", glow: "#ffb347", un: { t: "ach", key: "runs10", label: "Sail 10 voyages" } },
+    { id: "valhalla",name: "Valhalla",      a: "#ffffff", b: "#4a9be0", shape: "kite",   pat: "rings",  hull: ["#6e5c43", "#e6dccb", "#f5c542"], sail: ["#ffffff", "#f5c542"], sailPat: "border",  emb: "valknut",  embC: "#d9a514", wake: "light", glow: "#fff3b0", un: { t: "ach", key: "top1", label: "Become the mightiest raider (#1)" } },
     // 🎃 Halloween (earnable only Oct 1 – Nov 2)
-    { id: "ghost",   name: "Ghost Ship",    a: "#c8f7dc", b: "#7ee8b0", sail: ["#e8fff2", "#7ee8b0"], pat: "rings",  glow: "#9cffc8", ghostly: true, season: "halloween", un: { t: "ach", key: "h_dutch", label: "Sink the Flying Dutchman" } },
-    { id: "bone",    name: "Bone Raft",     a: "#efe9da", b: "#232323", sail: ["#1a1a1a", "#efe9da"], pat: "skull",  season: "halloween", un: { t: "ach", key: "h_treats", label: "Gather 150 treats in one voyage" } },
-    { id: "pumpkin", name: "Pumpkin Patch", a: "#ff7a00", b: "#ff9a2e", sail: ["#2d1b00", "#ff7a00"], pat: "jack",   glow: "#ffb15c", season: "halloween", un: { t: "buy", cost: 500 } },
+    { id: "ghost",   name: "Ghost Ship",    a: "#c8f7dc", b: "#7ee8b0", shape: "round",  pat: "rings",  hull: ["#123128", "#3f6e62", "#9cffc8"], sail: ["#e8fff2", "#7ee8b0"], sailPat: "torn",    emb: "wisp",     embC: "#3fbf86", wake: "mist", glow: "#9cffc8", ghostly: true, season: "halloween", un: { t: "ach", key: "h_dutch", label: "Sink the Flying Dutchman" } },
+    { id: "bone",    name: "Bone Raft",     a: "#efe9da", b: "#232323", shape: "square", pat: "skull",  hull: ["#2a2620", "#bdb39b", "#f4efe2"], sail: ["#1a1a1a", "#efe9da"], sailPat: "torn",    emb: "skull",    embC: "#efe9da", wake: "ash",     season: "halloween", un: { t: "ach", key: "h_treats", label: "Gather 150 treats in one voyage" } },
+    { id: "pumpkin", name: "Pumpkin Patch", a: "#ff7a00", b: "#2f6b1a", shape: "round",  pat: "jack",   hull: ["#120a1a", "#3a2150", "#9b59ff"], sail: ["#2d1b3a", "#ff7a00"], sailPat: "hstripe", emb: "jack",     wake: "pleaves", glow: "#ffb15c", season: "halloween", un: { t: "buy", cost: 500 } },
     // 🎄 Christmas (earnable only Nov 20 – Jan 2)
-    { id: "candycane", name: "Candy Cane",  a: "#e74c3c", b: "#ffffff", sail: ["#ffffff", "#e74c3c"], pat: "stripe", season: "christmas", un: { t: "buy", cost: 500 } },
-    { id: "frostbite", name: "Frostbite",   a: "#bfe9ff", b: "#ffffff", sail: ["#eaf7ff", "#5dade2"], pat: "snowflake", glow: "#d6f2ff", season: "christmas", un: { t: "ach", key: "x_krampus", label: "Sink Krampus" } },
-    { id: "ginger",  name: "Gingerbread",   a: "#b9773d", b: "#9a5f2c", sail: ["#fff4e0", "#b9773d"], pat: "icing",  season: "christmas", un: { t: "ach", key: "x_treats", label: "Gather 150 treats in one voyage" } },
+    { id: "candycane", name: "Candy Cane",  a: "#e53935", b: "#ffffff", shape: "round",  pat: "stripe", hull: ["#4a0c0c", "#c62828", "#ffffff"], sail: ["#ffffff", "#e53935"], sailPat: "diag",    emb: "mint",     wake: "candy",   season: "christmas", un: { t: "buy", cost: 500 } },
+    { id: "frostbite", name: "Frostbite",   a: "#0b1d3a", b: "#5ff2ff", shape: "hex",    pat: "snowflake", hull: ["#040912", "#0f2142", "#5ff2ff"], sail: ["#0b1d3a", "#5ff2ff"], sailPat: "plain", emb: "flake", embC: "#5ff2ff", wake: "snow", glow: "#7ff6ff", season: "christmas", un: { t: "ach", key: "x_krampus", label: "Sink Krampus" } },
+    { id: "ginger",  name: "Gingerbread",   a: "#b9773d", b: "#fff4e0", shape: "round",  pat: "icing",  hull: ["#3a1f0c", "#8a5a2c", "#fff4e0"], sail: ["#fff4e0", "#b9773d"], sailPat: "border",  emb: "ginger",   wake: "sprinkle", season: "christmas", un: { t: "ach", key: "x_treats", label: "Gather 150 treats in one voyage" } },
   ];
-  const BOSS_SKINS = { krampus: { id: "krampus", a: "#5b0f0f", b: "#111111", sail: ["#111111", "#a93226"], pat: "cross", glow: "#c0392b" } };
+  const BOSS_SKINS = { krampus: { id: "krampus", a: "#5b0f0f", b: "#111111", shape: "kite", pat: "cross", hull: ["#080202", "#2a0808", "#a93226"], sail: ["#111111", "#a93226"], sailPat: "torn", emb: "horns", embC: "#e74c3c", wake: "crimson", glow: "#c0392b" } };
+  const WAKE_NAME = { foam: "Sea foam", leaves: "Falling leaves", feather: "Raven feathers", frost: "Frost sparkle", gold: "Gold glitter", aurora: "Northern lights", spark: "Lightning sparks",
+    ink: "Kraken ink", crimson: "Red sparks", embers: "Embers", light: "Holy light", mist: "Ghost mist", ash: "Ash", pleaves: "Autumn leaves", candy: "Candy sparkle", snow: "Snowfall", sprinkle: "Sprinkles" };
   const SEASON_LABEL = { halloween: "🎃 Halloween only", christmas: "🎄 Christmas only" };
   const FIGS = [
     { id: "dragon",  name: "Dragon",  un: { t: "free" } },
@@ -197,7 +216,7 @@ body.shorts #recHint{display:block}
     { id: "snowman", name: "Snowman", season: "christmas", un: { t: "buy", cost: 250 } },
   ];
   const inSeason = it => !it.season || it.season === SEASON;
-  const ROGUE_SKIN = { id: "rogue", a: "#1b1b1b", b: "#c0392b", sail: ["#1b1b1b", "#c0392b"], pat: "cross" };
+  const ROGUE_SKIN = { id: "rogue", a: "#1b1b1b", b: "#c0392b", shape: "kite", pat: "cross", hull: ["#050505", "#1f1f1f", "#c0392b"], sail: ["#1b1b1b", "#c0392b"], sailPat: "torn", emb: "skull", embC: "#e8e8e8", wake: "crimson" };
   const NAMES = ["Ragnhild", "Bjorn", "Sigrid", "Ulf", "Astrid", "Leif", "Freydis", "Hakon", "Gunnar", "Thyra", "Eirik", "Solveig", "Knut", "Ingrid",
     "Halfdan", "Brynja", "Orm", "Dagny", "Sven", "Yrsa", "Torvald", "Gudrun", "Arne", "Hilda", "Rolf", "Signy", "Asger", "Liv"];
   const ROGUE_NAMES = ["Hrafn the Grim", "Skarde Bloodaxe", "Ivar Boneless", "Grima Wolfsbane"];
@@ -345,7 +364,7 @@ body.shorts #recHint{display:block}
     const nm = ($("name").value.trim() || "You").slice(0, 14); store.set("ls_name", nm);
     setupWorld(); player = makeShip(nm, "player"); ships.push(player);
     cam.x = player.x; cam.y = player.y; cam.z = 1; running = true;
-    $("start").classList.add("hidden"); $("over").classList.add("hidden");
+    $("start").classList.add("hidden"); $("over").classList.add("hidden"); stopBoard();
     if (TH) toast(TH.toast[0], TH.toast[1]); else toast("⛵ Set sail!", "Gather gold. Avoid shields and rocks.");
   }
   function setupWorld() {
@@ -376,7 +395,7 @@ body.shorts #recHint{display:block}
       const why = how === "rock" ? "Ran aground on a rocky isle." : how === "edge" ? "Sailed off the edge of the world." : how === "bolt" ? "Struck by lightning." : `Crashed into <b>${by ? by.name : "a ship"}</b>.`;
       $("overText").innerHTML = `Biggest shield wall: <b>${s.peak || s.len}</b> · Raiders sunk: <b>${s.kills}</b><br>${why}<br>Best ever: <b>${best}</b>` +
         `<br><span class="plunder">+${earned} plunder</span> <span style="opacity:.75">(${s.peak || s.len} wall + ${s.kills * 25} for sinks)</span>`;
-      setTimeout(() => $("over").classList.remove("hidden"), 900);
+      postScore(s); setTimeout(() => { $("over").classList.remove("hidden"); watchBoard(); }, 900);
     } else {
       if (by && by.isPlayer) toast(`⚔️ ${s.name} sank!`);
       setTimeout(() => { const i = ships.indexOf(s); if (i < 0) return; const n = s.boss ? makeBoss() : makeShip(s.name, s.kind);
@@ -544,6 +563,7 @@ body.shorts #recHint{display:block}
     for (let i = powers.length - 1; i >= 0; i--) if ((powers[i].life -= f) <= 0) powers.splice(i, 1);
     if (powers.length < POWER_TARGET && Math.random() < .02 * f) spawnPower();
     for (const b of bolts) b.t -= f; bolts = bolts.filter(b => b.t > 0);
+    for (const s of ships) if (s.alive) wakeFor(s, f); stepParts(f);
     // camera
     const follow = player && player.alive ? player : (!player ? ships.find(x => x.alive) : null);
     if (follow) { cam.x += (follow.x - cam.x) * .1; cam.y += (follow.y - cam.y) * .1; }
@@ -675,30 +695,263 @@ body.shorts #recHint{display:block}
     if (!still && tw > .93 && g.type !== "silver") { c.fillStyle = "#fffbe6"; c.fillRect(x - 2 * sc, y - 2 * sc, 1.4, 1.4); }
   }
   // loot that doesn't animate is drawn once into a small picture, then stamped (far cheaper than 4-8 shapes each)
-  const lootCache = new Map(), LOOT_ANIM = { halloween: ["gem", "goblet"], christmas: ["coin"] }, LS = 24, LR = 2;
+  const LSC = 1.75, lootCache = new Map(), LOOT_ANIM = { halloween: ["gem", "goblet"], christmas: ["coin"] }, LS = 28, LR = 2;
+  const HALO = { silver: "#e8f1f5", amber: "#ff9f43", goblet: "#ffd54f", horn: "#fff1c9", chest: "#ffd54f" };
+  const haloCache = new Map();
+  function haloSprite(col) {
+    let c = haloCache.get(col); if (c) return c;
+    c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, col + "aa"); g.addColorStop(.45, col + "44"); g.addColorStop(1, col + "00"); x.fillStyle = g; x.fillRect(0, 0, 64, 64); haloCache.set(col, c); return c;
+  }
   function lootSprite(g) {
     const k = g.type + "|" + (g.type === "gem" ? g.h : g.type === "chest" ? Math.floor(g.t) % 4 : "");
     let c = lootCache.get(k); if (c) return c;
     c = document.createElement("canvas"); c.width = c.height = LS * 2 * LR; const x = c.getContext("2d"); x.scale(LR, LR);
-    drawLootItem(x, g, LS, LS, 1.4, true); lootCache.set(k, c); return c;
+    x.fillStyle = "rgba(0,0,0,.28)"; x.beginPath(); x.ellipse(LS + 1, LS + 4 * LSC, 3.4 * LSC * (g.type === "chest" ? 2 : 1), 1.4 * LSC, 0, 0, 7); x.fill();   // little shadow on the water
+    drawLootItem(x, g, LS, LS, LSC, true); lootCache.set(k, c); return c;
   }
   function drawGold() {
-    const hx = vw / 2 / cam.z + 20, hy = vh / 2 / cam.z + 20, cx = cam.x, cy = cam.y, anim = SEASON ? LOOT_ANIM[SEASON] : null;
+    const hx = vw / 2 / cam.z + 24, hy = vh / 2 / cam.z + 24, cx = cam.x, cy = cam.y, anim = SEASON ? LOOT_ANIM[SEASON] : null;
     for (let j = 0; j < gold.length; j++) { const g = gold[j]; if (Math.abs(g.x - cx) > hx || Math.abs(g.y - cy) > hy) continue;
-      if (anim && anim.includes(g.type)) { drawLootItem(ctx, g, g.x, g.y, 1.4); continue; }
-      ctx.drawImage(lootSprite(g), g.x - LS, g.y - LS, LS * 2, LS * 2);
-      if (g.type !== "silver" && Math.sin(tick * .05 + g.t) > .93) { ctx.fillStyle = "#fffbe6"; ctx.fillRect(g.x - 2.8, g.y - 2.8, 1.4, 1.4); } }
+      const bob = Math.sin(tick * .06 + g.t) * 1.3, y = g.y + bob;
+      if (g.v >= 2) { const col = g.type === "gem" ? `hsl(${g.h},90%,65%)` : HALO[g.type] || "#ffffff", R = (g.type === "chest" ? 30 : 12 + g.v) * (.9 + .12 * Math.sin(tick * .08 + g.t));
+        ctx.drawImage(haloSprite(g.type === "gem" ? ["#ff5c7a", "#5cff9d", "#5cb8ff", "#c77dff"][GEM_HUES.indexOf(g.h)] || "#ffffff" : col), g.x - R, y - R, R * 2, R * 2); }
+      if (anim && anim.includes(g.type)) { drawLootItem(ctx, g, g.x, y, LSC); continue; }
+      ctx.drawImage(lootSprite(g), g.x - LS, y - LS, LS * 2, LS * 2);
+      if (g.type !== "silver" && Math.sin(tick * .05 + g.t) > .93) { const s = 2.2; ctx.fillStyle = "#fffbe6"; ctx.beginPath(); ctx.moveTo(g.x - 3, y - 3 - s * 1.5); ctx.lineTo(g.x - 3 + s * .4, y - 3); ctx.lineTo(g.x - 3, y - 3 + s * 1.5); ctx.lineTo(g.x - 3 - s * .4, y - 3); ctx.fill(); } }
+  }
+  // power-ups: carved runestones, painted once each; the rarity glow animates on top
+  const powerCache = new Map();
+  function powerSprite(p) {
+    let c = powerCache.get(p.id); if (c) return c;
+    c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"); x.scale(2, 2); x.translate(32, 32);
+    const col = RCOL[p.r];
+    x.fillStyle = "rgba(0,0,0,.35)"; x.beginPath(); x.ellipse(2, 19, 15, 5, 0, 0, 7); x.fill();
+    const stone = () => { x.beginPath(); x.moveTo(-14, 18); x.lineTo(-15, -4); x.quadraticCurveTo(-15, -20, 0, -21); x.quadraticCurveTo(15, -20, 15, -4); x.lineTo(14, 18); x.closePath(); };
+    const g = x.createLinearGradient(-15, -21, 15, 18); g.addColorStop(0, "#8d949c"); g.addColorStop(.5, "#5d646c"); g.addColorStop(1, "#343940");
+    x.fillStyle = g; stone(); x.fill(); x.lineWidth = 3; x.strokeStyle = col; x.stroke();
+    x.lineWidth = 1; x.strokeStyle = "rgba(255,255,255,.25)"; x.beginPath(); x.moveTo(-12, 15); x.lineTo(-12.5, -4); x.quadraticCurveTo(-12.5, -17, 0, -18); x.stroke();   // carved edge highlight
+    x.strokeStyle = col + "aa"; x.lineWidth = 1.2; x.beginPath(); for (let k = 0; k < 3; k++) { x.moveTo(-9 + k * 9, 12); x.lineTo(-7 + k * 9, 16); x.lineTo(-5 + k * 9, 12); } x.stroke();   // little runes
+    x.font = "17px system-ui"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(p.icon, 0, -2);
+    powerCache.set(p.id, c); return c;
   }
   function drawPowers() {
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    for (const p of powers) { if (!onScreen(p.x, p.y, 40)) continue;
-      const bob = Math.sin(tick * .05 + p.t) * 3, c = RCOL[p.p.r], fade = p.life < 300 ? (Math.sin(tick * .3) > 0 ? 1 : .35) : 1;
+    for (const p of powers) { if (!onScreen(p.x, p.y, 50)) continue;
+      const bob = Math.sin(tick * .05 + p.t) * 3, c = RCOL[p.p.r], fade = p.life < 300 ? (Math.sin(tick * .3) > 0 ? 1 : .35) : 1, y = p.y + bob;
       ctx.globalAlpha = fade;
-      ctx.fillStyle = c + "33"; ctx.beginPath(); ctx.arc(p.x, p.y + bob, 22 + Math.sin(tick * .08 + p.t) * 3, 0, 7); ctx.fill();
-      ctx.fillStyle = "#4b5056"; ctx.beginPath(); ctx.roundRect(p.x - 13, p.y - 15 + bob, 26, 30, 8); ctx.fill();   // runestone
-      ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.stroke();
-      ctx.font = "16px system-ui"; ctx.fillText(p.p.icon, p.x, p.y + bob + 1);
+      ctx.drawImage(haloSprite(c), p.x - 34, y - 34, 68, 68);
+      ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.globalAlpha = fade * (.45 + .3 * Math.sin(tick * .08 + p.t));
+      ctx.beginPath(); ctx.arc(p.x, y, 25 + Math.sin(tick * .08 + p.t) * 3, 0, 7); ctx.stroke();
+      if (p.p.r >= 2) { ctx.setLineDash([6, 8]); ctx.lineDashOffset = -tick * .6; ctx.beginPath(); ctx.arc(p.x, y, 31, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      if (p.p.r >= 3) { ctx.fillStyle = "#fff3b0"; for (let k = 0; k < 4; k++) { const a = tick * .04 + k * 1.571; ctx.beginPath(); ctx.arc(p.x + Math.cos(a) * 34, y + Math.sin(a) * 34, 2.2, 0, 7); ctx.fill(); } }
+      ctx.globalAlpha = fade; ctx.drawImage(powerSprite(p.p), p.x - 32, y - 32, 64, 64);
       ctx.globalAlpha = 1; }
+  }
+  /* ---------- wake trails: a small pooled particle system (no garbage, hard cap) ---------- */
+  const WAKES = {
+    foam:    { c: ["#ffffff", "#d9f2ff"], s: [1.5, 3.2], life: 38, grow: .05, a: .55 },
+    leaves:  { c: ["#4caf50", "#8bc34a", "#2e7d32"], s: [2, 3.2], life: 70, grow: 0, a: .9, leaf: 1 },
+    pleaves: { c: ["#ff8f00", "#e65100", "#ffb300", "#8d4b00"], s: [2, 3.4], life: 70, grow: 0, a: .9, leaf: 1 },
+    feather: { c: ["#1b1b22", "#3d3555", "#6e5bb5"], s: [2.2, 3.4], life: 70, grow: 0, a: .85, leaf: 1 },
+    frost:   { c: ["#ffffff", "#bfe7ff", "#7fd0ff"], s: [1.6, 3], life: 55, grow: 0, a: .95, spark: 1 },
+    gold:    { c: ["#ffe066", "#ffd700", "#fff3b0"], s: [1.6, 3], life: 55, grow: 0, a: 1, spark: 1 },
+    aurora:  { c: null, s: [2.5, 4.5], life: 60, grow: .08, a: .55 },
+    spark:   { c: ["#ffd23f", "#fff6c2", "#c9a7ff"], s: [2, 4], life: 22, grow: 0, a: 1, line: 1 },
+    ink:     { c: ["#04241e", "#0b3a32"], s: [3, 5], life: 70, grow: .12, a: .55 },
+    crimson: { c: ["#ff1f3d", "#b3001b", "#ff6b6b"], s: [1.4, 2.6], life: 32, grow: 0, a: 1, spark: 1 },
+    embers:  { c: ["#ffb21f", "#ff7b00", "#ffe08a"], s: [1.4, 2.8], life: 45, grow: -.02, a: 1, rise: 1 },
+    light:   { c: ["#fffbe6", "#fff3b0"], s: [2.5, 4.5], life: 45, grow: .1, a: .5 },
+    mist:    { c: ["#bfffe0", "#9cffc8"], s: [4, 7], life: 60, grow: .15, a: .28 },
+    ash:     { c: ["#9e9e9e", "#cfc6b0", "#5d5d5d"], s: [1.6, 3], life: 55, grow: .02, a: .7 },
+    candy:   { c: ["#ff4b4b", "#ffffff", "#7dff9a"], s: [1.6, 3], life: 50, grow: 0, a: 1, spark: 1 },
+    snow:    { c: ["#ffffff", "#e6f9ff"], s: [1.6, 3.2], life: 70, grow: 0, a: .95 },
+    sprinkle:{ c: ["#ff5c8a", "#5cc8ff", "#ffe066", "#7dff9a", "#ffffff"], s: [2, 3], life: 55, grow: 0, a: 1, line: 1 },
+  };
+  const PMAX = COARSE ? 260 : 420, parts = [];
+  for (let i = 0; i < PMAX; i++) parts.push({ on: false });
+  let pNext = 0;
+  function emit(x, y, kind, vx, vy) {
+    const w = WAKES[kind] || WAKES.foam, p = parts[pNext]; pNext = (pNext + 1) % PMAX;
+    p.on = true; p.x = x; p.y = y; p.vx = vx + rnd(-.35, .35); p.vy = vy + rnd(-.35, .35); p.w = w;
+    p.c = w.c ? w.c[(Math.random() * w.c.length) | 0] : `hsl(${(tick * 3 + rnd(0, 80)) % 360},80%,65%)`;
+    p.s = rnd(w.s[0], w.s[1]); p.max = p.life = w.life * rnd(.7, 1.1); p.rot = rnd(0, 6.3); p.vr = rnd(-.1, .1);
+  }
+  function wakeFor(s, f) {
+    const segs = s.segs; if (segs.length < 2 || !onScreen(s.x, s.y, 400)) return;
+    const kind = s.skin.wake || "foam", rate = s.isPlayer ? (s.boosting ? .9 : .5) : .18;
+    s.wk = (s.wk || 0) + rate * f;
+    while (s.wk >= 1) { s.wk--;
+      const t = segs[segs.length - 1], r = radius(s);
+      emit(t.x + rnd(-r * .5, r * .5), t.y + rnd(-r * .5, r * .5), kind, -Math.cos(s.a) * .2, -Math.sin(s.a) * .2);
+      if (s.isPlayer && Math.random() < .5) { const side = Math.random() < .5 ? 1 : -1, pa = s.a + side * 1.9;   // bow spray
+        emit(s.x + Math.cos(s.a) * r * 1.2, s.y + Math.sin(s.a) * r * 1.2, "foam", Math.cos(pa) * .9, Math.sin(pa) * .9); } }
+  }
+  function stepParts(f) {
+    for (let i = 0; i < PMAX; i++) { const p = parts[i]; if (!p.on) continue;
+      p.life -= f; if (p.life <= 0) { p.on = false; continue; }
+      p.x += p.vx * f; p.y += p.vy * f; p.vx *= .97; p.vy *= .97; p.s = Math.max(.3, p.s + p.w.grow * f); p.rot += p.vr * f;
+      if (p.w.rise) p.vy -= .02 * f; }
+  }
+  function drawParts() {
+    for (let i = 0; i < PMAX; i++) { const p = parts[i]; if (!p.on || !onScreen(p.x, p.y, 10)) continue;
+      const w = p.w; ctx.globalAlpha = w.a * Math.min(1, p.life / p.max * 1.6); ctx.fillStyle = ctx.strokeStyle = p.c;
+      if (w.spark) { const s = p.s; ctx.beginPath(); ctx.moveTo(p.x, p.y - s * 1.6); ctx.lineTo(p.x + s * .45, p.y); ctx.lineTo(p.x, p.y + s * 1.6); ctx.lineTo(p.x - s * .45, p.y); ctx.closePath();
+        ctx.moveTo(p.x - s * 1.6, p.y); ctx.lineTo(p.x, p.y - s * .45); ctx.lineTo(p.x + s * 1.6, p.y); ctx.lineTo(p.x, p.y + s * .45); ctx.closePath(); ctx.fill(); }
+      else if (w.line) { ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(p.x - Math.cos(p.rot) * p.s, p.y - Math.sin(p.rot) * p.s); ctx.lineTo(p.x + Math.cos(p.rot) * p.s, p.y + Math.sin(p.rot) * p.s); ctx.stroke(); }
+      else if (w.leaf) { ctx.beginPath(); ctx.ellipse(p.x, p.y, p.s * 1.5, p.s * .7, p.rot, 0, 7); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 7); ctx.fill(); } }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- shields: shaped, shaded, with a metal rim and boss. Painted once per skin, then stamped ---------- */
+  function shieldPath(c, shape, x, y, R) {
+    c.beginPath();
+    if (shape === "kite") { c.moveTo(x - R * .9, y - R * .75); c.quadraticCurveTo(x, y - R * 1.05, x + R * .9, y - R * .75); c.quadraticCurveTo(x + R * .95, y + R * .35, x, y + R * 1.1); c.quadraticCurveTo(x - R * .95, y + R * .35, x - R * .9, y - R * .75); c.closePath(); }
+    else if (shape === "square") { const k = R * .86; c.roundRect(x - k, y - k, k * 2, k * 2, R * .22); }
+    else if (shape === "hex") { for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + Math.PI / 6; k ? c.lineTo(x + Math.cos(a) * R, y + Math.sin(a) * R) : c.moveTo(x + Math.cos(a) * R, y + Math.sin(a) * R); } c.closePath(); }
+    else c.arc(x, y, R, 0, 7);
+  }
+  function drawShield(c, sk, x, y, rad, i, ang) {
+    const shape = sk.shape || "round", alt = i % 2, base = sk.pat === "rainbow" ? `hsl(${(i * 24 + tick * 2) % 360},70%,55%)` : alt ? sk.a : sk.b, other = alt ? sk.b : sk.a;
+    const ga = c.globalAlpha; if (sk.ghostly) c.globalAlpha = ga * .7;
+    if (sk.glow) { c.fillStyle = sk.glow + "40"; c.beginPath(); c.arc(x, y, rad * 1.4, 0, 7); c.fill(); }
+    c.fillStyle = "rgba(0,0,0,.28)"; shieldPath(c, shape, x + rad * .1, y + rad * .16, rad); c.fill();   // drop shadow on the hull
+    c.fillStyle = base; shieldPath(c, shape, x, y, rad); c.fill();
+    c.save(); shieldPath(c, shape, x, y, rad); c.clip();
+    c.strokeStyle = other; c.fillStyle = other; c.lineWidth = rad * .28;
+    switch (sk.pat) {
+      case "alt": c.beginPath(); c.moveTo(x, y); c.arc(x, y, rad * 1.2, -Math.PI / 2, 0); c.lineTo(x, y); c.arc(x, y, rad * 1.2, Math.PI / 2, Math.PI); c.fill(); break;   // quartered
+      case "cross": c.beginPath(); c.moveTo(x - rad, y); c.lineTo(x + rad, y); c.moveTo(x, y - rad); c.lineTo(x, y + rad); c.stroke(); break;
+      case "split": c.beginPath(); c.moveTo(x, y); c.arc(x, y, rad * 1.3, ang, ang + Math.PI); c.fill(); break;
+      case "rings": c.lineWidth = rad * .16; c.beginPath(); c.arc(x, y, rad * .62, 0, 7); c.stroke(); break;
+      case "spiral": c.lineWidth = rad * .18; c.beginPath(); for (let k = 0; k < 16; k++) { const a = k * .7 + i, rr = rad * k / 16; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.stroke(); break;
+      case "bolt": c.lineWidth = rad * .2; c.beginPath(); c.moveTo(x - rad * .3, y - rad); c.lineTo(x + rad * .1, y - rad * .1); c.lineTo(x - rad * .15, y + rad * .05); c.lineTo(x + rad * .3, y + rad); c.stroke(); break;
+      case "skull": c.fillStyle = other; c.beginPath(); c.arc(x, y - rad * .1, rad * .5, 0, 7); c.fill(); c.fillRect(x - rad * .28, y + rad * .25, rad * .56, rad * .3);
+        c.fillStyle = base; c.beginPath(); c.arc(x - rad * .2, y - rad * .15, rad * .14, 0, 7); c.arc(x + rad * .2, y - rad * .15, rad * .14, 0, 7); c.fill(); break;
+      case "jack": c.fillStyle = `rgba(40,20,0,.9)`; c.beginPath(); c.moveTo(x - rad * .55, y - rad * .05); c.lineTo(x - rad * .15, y - rad * .05); c.lineTo(x - rad * .35, y - rad * .45); c.fill();
+        c.beginPath(); c.moveTo(x + rad * .55, y - rad * .05); c.lineTo(x + rad * .15, y - rad * .05); c.lineTo(x + rad * .35, y - rad * .45); c.fill(); c.fillRect(x - rad * .5, y + rad * .2, rad, rad * .22);
+        c.fillStyle = other; c.fillRect(x - rad * .08, y - rad * 1.0, rad * .16, rad * .3); break;
+      case "stripe": c.lineWidth = rad * .3; c.beginPath(); for (let k = -2; k <= 2; k++) { c.moveTo(x - rad + k * rad * .6, y + rad); c.lineTo(x + rad + k * rad * .6, y - rad); } c.stroke(); break;
+      case "snowflake": c.lineWidth = rad * .14; c.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; c.moveTo(x - Math.cos(a) * rad * .7, y - Math.sin(a) * rad * .7); c.lineTo(x + Math.cos(a) * rad * .7, y + Math.sin(a) * rad * .7); } c.stroke(); break;
+      case "icing": c.strokeStyle = "#fff8ec"; c.lineWidth = rad * .14; c.beginPath(); for (let k = 0; k <= 24; k++) { const a = k / 24 * Math.PI * 2, rr = rad * (.68 + .08 * Math.sin(k * 3)); k ? c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : c.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.stroke(); break;
+      case "flame": c.fillStyle = `rgba(255,190,60,${.55 + .4 * Math.sin(tick * .2 + i)})`; c.beginPath(); c.moveTo(x, y - rad * .7); c.quadraticCurveTo(x + rad * .6, y, x, y + rad * .6); c.quadraticCurveTo(x - rad * .6, y, x, y - rad * .7); c.fill(); break;
+    }
+    // light from the top-left, shade at the bottom-right
+    const g = c.createRadialGradient(x - rad * .4, y - rad * .45, rad * .05, x, y, rad * 1.15);
+    g.addColorStop(0, "rgba(255,255,255,.38)"); g.addColorStop(.45, "rgba(255,255,255,0)"); g.addColorStop(1, "rgba(0,0,0,.32)"); c.fillStyle = g; c.fillRect(x - rad * 1.2, y - rad * 1.2, rad * 2.4, rad * 2.4);
+    c.restore();
+    c.lineWidth = Math.max(1.2, rad * .16); c.strokeStyle = "#1e1309"; shieldPath(c, shape, x, y, rad); c.stroke();   // iron rim
+    c.lineWidth = Math.max(.6, rad * .06); c.strokeStyle = "rgba(225,228,232,.55)"; c.stroke();
+    const bg = c.createRadialGradient(x - rad * .08, y - rad * .1, 0, x, y, rad * .3); bg.addColorStop(0, "#f4f6f8"); bg.addColorStop(1, "#7d838b");   // boss
+    c.fillStyle = bg; c.beginPath(); c.arc(x, y, rad * .27, 0, 7); c.fill(); c.strokeStyle = "#2b2f35"; c.lineWidth = Math.max(.6, rad * .06); c.stroke();
+    c.globalAlpha = ga;
+  }
+  const shieldCache = new Map(), SR = 32;
+  function drawShieldFast(c, sk, x, y, rad, i, ang) {
+    if (sk.pat === "rainbow" || sk.pat === "flame") { drawShield(c, sk, x, y, rad, i, ang); return; }
+    const key = sk.id + (i % 2); let spr = shieldCache.get(key);
+    if (!spr) { spr = document.createElement("canvas"); const half = Math.ceil(SR * 1.5); spr.width = spr.height = half * 2;
+      drawShield(spr.getContext("2d"), { ...sk, ghostly: false }, half, half, SR, i % 2, 0); spr.k = half / SR; shieldCache.set(key, spr); }
+    const h = rad * spr.k, ga = c.globalAlpha; if (sk.ghostly) c.globalAlpha = ga * .7;
+    if (sk.pat === "split" || (sk.shape && sk.shape !== "round")) { const ca = Math.cos(ang), sa = Math.sin(ang);   // shaped shields face outward along the hull
+      c.transform(ca, sa, -sa, ca, x, y); c.drawImage(spr, -h, -h, h * 2, h * 2); c.transform(ca, -sa, sa, ca, 0, 0); c.translate(-x, -y); }
+    else c.drawImage(spr, x - h, y - h, h * 2, h * 2);
+    c.globalAlpha = ga;
+  }
+
+  /* ---------- sails: billowing cloth with stripes and an emblem, painted once per skin ---------- */
+  function drawEmblem(c, emb, S, col) {   // centred at 0,0, "up" is -y, fits in a box of +/- S
+    c.fillStyle = c.strokeStyle = col || "#fff"; c.lineCap = "round"; c.lineJoin = "round";
+    switch (emb) {
+      case "wolf": c.beginPath(); c.moveTo(-S * .7, -S * .9); c.lineTo(-S * .35, -S * .2); c.lineTo(S * .35, -S * .2); c.lineTo(S * .7, -S * .9); c.lineTo(S * .75, S * .1); c.lineTo(S * .25, S * .55); c.lineTo(0, S * .95); c.lineTo(-S * .25, S * .55); c.lineTo(-S * .75, S * .1); c.closePath(); c.fill();
+        c.fillStyle = "rgba(0,0,0,.6)"; c.beginPath(); c.arc(-S * .3, S * .05, S * .1, 0, 7); c.arc(S * .3, S * .05, S * .1, 0, 7); c.fill(); break;
+      case "tree": c.lineWidth = S * .16; c.beginPath(); c.moveTo(0, S * .9); c.lineTo(0, -S * .1); c.moveTo(0, S * .55); c.lineTo(-S * .5, S * .95); c.moveTo(0, S * .55); c.lineTo(S * .5, S * .95); c.stroke();
+        c.beginPath(); c.arc(0, -S * .35, S * .55, 0, 7); c.arc(-S * .45, -S * .05, S * .35, 0, 7); c.arc(S * .45, -S * .05, S * .35, 0, 7); c.fill(); break;
+      case "raven": c.beginPath(); c.moveTo(0, -S * .5); c.quadraticCurveTo(-S * .5, -S * .9, -S, -S * .4); c.quadraticCurveTo(-S * .5, -S * .3, -S * .2, S * .1); c.lineTo(-S * .15, S * .8); c.lineTo(0, S * .55);
+        c.lineTo(S * .15, S * .8); c.lineTo(S * .2, S * .1); c.quadraticCurveTo(S * .5, -S * .3, S, -S * .4); c.quadraticCurveTo(S * .5, -S * .9, 0, -S * .5); c.fill();
+        c.beginPath(); c.arc(0, -S * .6, S * .2, 0, 7); c.fill(); c.beginPath(); c.moveTo(-S * .08, -S * .75); c.lineTo(0, -S * 1.0); c.lineTo(S * .08, -S * .75); c.fill(); break;
+      case "flake": c.lineWidth = S * .14; c.beginPath(); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3, ex = Math.cos(a) * S * .95, ey = Math.sin(a) * S * .95; c.moveTo(0, 0); c.lineTo(ex, ey);
+          const mx = ex * .6, my = ey * .6; c.moveTo(mx, my); c.lineTo(mx + Math.cos(a + .7) * S * .28, my + Math.sin(a + .7) * S * .28); c.moveTo(mx, my); c.lineTo(mx + Math.cos(a - .7) * S * .28, my + Math.sin(a - .7) * S * .28); } c.stroke(); break;
+      case "crown": c.beginPath(); c.moveTo(-S * .85, S * .55); c.lineTo(-S * .85, -S * .45); c.lineTo(-S * .42, S * .05); c.lineTo(0, -S * .75); c.lineTo(S * .42, S * .05); c.lineTo(S * .85, -S * .45); c.lineTo(S * .85, S * .55); c.closePath(); c.fill();
+        c.fillStyle = "#c0392b"; c.beginPath(); c.arc(0, S * .25, S * .14, 0, 7); c.fill(); break;
+      case "star": c.beginPath(); for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8 - Math.PI / 2, rr = k % 2 ? S * .32 : (k % 4 ? S * .7 : S); k ? c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); c.fill(); break;
+      case "bolt": c.beginPath(); c.moveTo(S * .2, -S); c.lineTo(-S * .55, S * .1); c.lineTo(-S * .05, S * .1); c.lineTo(-S * .25, S); c.lineTo(S * .6, -S * .2); c.lineTo(S * .08, -S * .2); c.closePath(); c.fill(); break;
+      case "tentacle": c.lineWidth = S * .22; for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * S * .25, S * .95); c.bezierCurveTo(sd * S * .9, S * .2, -sd * S * .1, -S * .3, sd * S * .5, -S * .7); c.arc(sd * S * .3, -S * .7, S * .2, 0, sd * 4, sd < 0); c.stroke(); } break;
+      case "axe": c.lineWidth = S * .16; c.beginPath(); c.moveTo(0, S); c.lineTo(0, -S * .85); c.stroke(); c.beginPath(); c.moveTo(0, -S * .75); c.quadraticCurveTo(S * .55, -S * .95, S * .85, -S * .3); c.quadraticCurveTo(S * .55, S * .05, 0, -S * .1); c.closePath(); c.fill();
+        c.beginPath(); c.moveTo(0, -S * .75); c.quadraticCurveTo(-S * .55, -S * .95, -S * .85, -S * .3); c.quadraticCurveTo(-S * .55, S * .05, 0, -S * .1); c.closePath(); c.fill(); break;
+      case "flame": c.beginPath(); c.moveTo(0, -S); c.quadraticCurveTo(S * .9, -S * .1, S * .55, S * .55); c.quadraticCurveTo(S * .3, S, 0, S); c.quadraticCurveTo(-S * .3, S, -S * .55, S * .55); c.quadraticCurveTo(-S * .9, -S * .1, 0, -S); c.fill();
+        c.fillStyle = "#fff3b0"; c.beginPath(); c.moveTo(0, -S * .2); c.quadraticCurveTo(S * .45, S * .3, 0, S * .8); c.quadraticCurveTo(-S * .45, S * .3, 0, -S * .2); c.fill(); break;
+      case "valknut": c.lineWidth = S * .13; for (let k = 0; k < 3; k++) { const ox = Math.cos(k * 2.094 - Math.PI / 2) * S * .28, oy = Math.sin(k * 2.094 - Math.PI / 2) * S * .28; c.beginPath();
+          for (let j = 0; j < 3; j++) { const a = j * 2.094 - Math.PI / 2; c.lineTo(ox + Math.cos(a) * S * .62, oy + Math.sin(a) * S * .62); } c.closePath(); c.stroke(); } break;
+      case "wisp": c.beginPath(); c.arc(0, -S * .2, S * .6, Math.PI, 0); c.lineTo(S * .6, S * .8); for (let k = 0; k < 4; k++) c.lineTo(S * .6 - (k + .5) * S * .3, S * (k % 2 ? .8 : .5)); c.lineTo(-S * .6, S * .8); c.closePath(); c.fill();
+        c.fillStyle = "rgba(0,0,0,.65)"; c.beginPath(); c.ellipse(-S * .22, -S * .2, S * .12, S * .18, 0, 0, 7); c.ellipse(S * .22, -S * .2, S * .12, S * .18, 0, 0, 7); c.fill(); break;
+      case "skull": c.beginPath(); c.arc(0, -S * .15, S * .7, 0, 7); c.fill(); c.fillRect(-S * .38, S * .3, S * .76, S * .5);
+        c.fillStyle = "rgba(0,0,0,.85)"; c.beginPath(); c.arc(-S * .28, -S * .15, S * .2, 0, 7); c.arc(S * .28, -S * .15, S * .2, 0, 7); c.fill(); c.beginPath(); c.moveTo(0, S * .05); c.lineTo(-S * .1, S * .3); c.lineTo(S * .1, S * .3); c.fill();
+        for (let k = -1; k <= 1; k++) c.fillRect(k * S * .2 - S * .02, S * .45, S * .04, S * .35); break;
+      case "jack": drawPumpkin(c, 0, S * .1, S * .8); break;
+      case "mint": c.fillStyle = "#fff"; c.beginPath(); c.arc(0, 0, S * .9, 0, 7); c.fill(); c.fillStyle = "#e53935"; for (let k = 0; k < 6; k++) { c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, S * .9, k * 1.047, k * 1.047 + .5); c.fill(); }
+        c.strokeStyle = "#e53935"; c.lineWidth = S * .08; c.beginPath(); c.arc(0, 0, S * .9, 0, 7); c.stroke(); break;
+      case "ginger": c.fillStyle = "#b9773d"; c.beginPath(); c.arc(0, -S * .55, S * .32, 0, 7); c.fill(); c.beginPath(); c.ellipse(0, S * .15, S * .38, S * .5, 0, 0, 7); c.fill();
+        c.lineWidth = S * .24; c.strokeStyle = "#b9773d"; c.beginPath(); c.moveTo(-S * .75, -S * .1); c.lineTo(S * .75, -S * .1); c.moveTo(-S * .25, S * .5); c.lineTo(-S * .5, S * .95); c.moveTo(S * .25, S * .5); c.lineTo(S * .5, S * .95); c.stroke();
+        c.fillStyle = "#fff"; c.beginPath(); c.arc(0, S * .05, S * .07, 0, 7); c.arc(0, S * .3, S * .07, 0, 7); c.fill(); break;
+      case "horns": c.lineWidth = S * .22; for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * S * .2, S * .6); c.quadraticCurveTo(sd * S * 1.0, S * .2, sd * S * .6, -S * .9); c.stroke(); }
+        c.beginPath(); c.arc(0, S * .55, S * .3, 0, 7); c.fill(); break;
+    }
+  }
+  const sailCache = new Map(), SAIL_R = 24, SAIL_K = 2;
+  function sailSprite(sk) {
+    let spr = sailCache.get(sk.id); if (spr) return spr;
+    const R = SAIL_R, half = R * 1.75; spr = document.createElement("canvas"); spr.width = spr.height = Math.ceil(half * 2 * SAIL_K); spr.half = half;
+    const c = spr.getContext("2d"); c.scale(SAIL_K, SAIL_K); c.translate(half, half);
+    // in ship space: +x is forward. The sail spans the beam (y) and bellies forward in the wind.
+    const back = -R * .3, front = R * .7, span = R * 1.75;
+    const path = () => { c.beginPath(); c.moveTo(back, -span); c.quadraticCurveTo(front, -span * .55, front, 0); c.quadraticCurveTo(front, span * .55, back, span);
+      if (sk.sailPat === "torn") { for (let k = 1; k < 6; k++) c.lineTo(back + (k % 2 ? R * .18 : 0), span - k * span * 2 / 6); } c.closePath(); };
+    c.fillStyle = "rgba(0,0,0,.3)"; c.save(); c.translate(R * .12, R * .18); path(); c.fill(); c.restore();   // shadow on the deck
+    c.fillStyle = sk.sail[0]; path(); c.fill();
+    c.save(); path(); c.clip(); c.fillStyle = sk.sail[1];
+    switch (sk.sailPat) {
+      case "vstripe": for (let k = -3; k <= 3; k += 2) c.fillRect(back - R, k * span / 3.5 - span / 7, R * 2, span / 3.5); break;
+      case "hstripe": c.fillRect(back + R * .18, -span, R * .22, span * 2); c.fillRect(back + R * .55, -span, R * .12, span * 2); break;
+      case "diag": c.save(); c.rotate(.6); for (let k = -6; k <= 6; k++) c.fillRect(k * R * .5, -span * 2, R * .22, span * 4); c.restore(); break;
+      case "border": c.lineWidth = R * .18; c.strokeStyle = sk.sail[1]; path(); c.stroke(); break;
+      case "aurora": for (let k = 0; k < 5; k++) { c.fillStyle = `hsla(${130 + k * 40},80%,60%,.45)`; c.beginPath(); c.ellipse(R * .1, -span + k * span * .5, R * .7, span * .22, .3, 0, 7); c.fill(); } break;
+    }
+    const sh = c.createLinearGradient(back, 0, front, 0); sh.addColorStop(0, "rgba(0,0,0,.25)"); sh.addColorStop(.6, "rgba(255,255,255,.12)"); sh.addColorStop(1, "rgba(0,0,0,.1)"); c.fillStyle = sh; c.fillRect(back, -span, front - back, span * 2);
+    c.restore();
+    if (sk.emb) { c.save(); c.translate(R * .18, 0); c.rotate(Math.PI / 2); drawEmblem(c, sk.emb, R * .62, sk.embC); c.restore(); }   // emblem's top points at the bow
+    c.strokeStyle = "#3b2410"; c.lineWidth = R * .14; c.lineCap = "round"; c.beginPath(); c.moveTo(back, -span * 1.08); c.lineTo(back, span * 1.08); c.stroke();   // the yard
+    c.fillStyle = "#2b1a0b"; c.beginPath(); c.arc(back, 0, R * .13, 0, 7); c.fill();   // mast
+    sailCache.set(sk.id, spr); return spr;
+  }
+
+  /* ---------- the whole ship (also used for wardrobe previews) ---------- */
+  function drawShipBody(c, sk, fig, segs, r, a, opt) {
+    const vis = opt.vis || (() => true), boosting = opt.boosting, rogue = opt.rogue, H = sk.hull || ["#2b1608", "#6b4423", "#a87a45"];
+    // hull: shadow, outline, planks, lighter deck
+    const hullPath = () => { c.beginPath(); c.moveTo(segs[0].x, segs[0].y); for (let i = 1; i < segs.length; i++) c.lineTo(segs[i].x, segs[i].y); };
+    c.lineCap = "round"; c.lineJoin = "round";
+    c.save(); c.translate(r * .18, r * .28); c.strokeStyle = "rgba(0,0,0,.25)"; c.lineWidth = r * 1.9; hullPath(); c.stroke(); c.restore();
+    hullPath(); c.strokeStyle = H[0]; c.lineWidth = r * 1.9; c.stroke();
+    c.strokeStyle = H[1]; c.lineWidth = r * 1.5; c.stroke();
+    c.globalAlpha *= .35; c.strokeStyle = H[2]; c.lineWidth = r * .7; c.stroke(); c.globalAlpha /= .35;
+    // oars
+    c.strokeStyle = "#d8b47a"; c.lineWidth = Math.max(1.4, r * .11); c.beginPath();
+    for (let i = 2; i < segs.length - 1; i += 2) { const p = segs[i]; if (!vis(p.x, p.y, r * 2)) continue; const q = segs[i - 1], aa = Math.atan2(q.y - p.y, q.x - p.x), sw = Math.sin(tick * (boosting ? .3 : .15) + i) * .5;
+      for (let side = -1; side <= 1; side += 2) { const oa = aa + side * (Math.PI / 2 + sw * side); c.moveTo(p.x + Math.cos(oa) * r * .7, p.y + Math.sin(oa) * r * .7); c.lineTo(p.x + Math.cos(oa) * r * 1.75, p.y + Math.sin(oa) * r * 1.75); } }
+    c.stroke();
+    // shields
+    const rad = r * .74, warned = opt.warned;
+    for (let i = segs.length - 1; i >= 1; i--) { const p = segs[i]; if (!vis(p.x, p.y, rad * 1.6)) continue; const q = segs[i - 1];
+      drawShieldFast(c, sk, p.x, p.y, rad, i, Math.atan2(q.y - p.y, q.x - p.x)); if (warned && tick - p.warn < 4) warned.push(p); }
+    // prow, sail, figurehead
+    c.save(); c.translate(segs[0].x, segs[0].y); c.rotate(a);
+    c.beginPath(); c.moveTo(r * 2.15, 0); c.quadraticCurveTo(r * .7, -r * 1.2, -r * .75, -r * .92); c.lineTo(-r * .75, r * .92); c.quadraticCurveTo(r * .7, r * 1.2, r * 2.15, 0);
+    c.fillStyle = H[1]; c.fill(); c.strokeStyle = H[0]; c.lineWidth = r * .2; c.stroke();
+    c.strokeStyle = H[2]; c.lineWidth = r * .12; c.beginPath(); c.moveTo(r * 1.9, 0); c.quadraticCurveTo(r * .6, -r * .95, -r * .6, -r * .72); c.moveTo(r * 1.9, 0); c.quadraticCurveTo(r * .6, r * .95, -r * .6, r * .72); c.stroke();   // gunwale trim
+    drawFig(c, fig, r, rogue);
+    const spr = sailSprite(sk), sc = r / SAIL_R, hh = spr.half * sc; c.drawImage(spr, -hh, -hh, hh * 2, hh * 2);
+    c.restore();
   }
   function drawShip(s) {
     if (!s.alive) return;
@@ -706,77 +959,17 @@ body.shorts #recHint{display:block}
     const hx = vw / 2 / cam.z, hy = vh / 2 / cam.z;
     if (s.bx1 + m < cam.x - hx || s.bx0 - m > cam.x + hx || s.by1 + m < cam.y - hy || s.by0 - m > cam.y + hy) return;   // whole ship off-screen
     ctx.globalAlpha = ghost ? .45 : s.solidify ? ((tick | 0) % 10 < 5 ? .9 : .5) : 1;
-    // wake behind the stern
-    const t = segs[segs.length - 1]; ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.beginPath(); ctx.arc(t.x, t.y, r * 1.3, 0, 7); ctx.fill();
-    // hull
-    ctx.strokeStyle = "#4a2f17"; ctx.lineWidth = r * 1.7; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y); for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y); ctx.stroke();
-    ctx.strokeStyle = "#6b4423"; ctx.lineWidth = r * 1.25; ctx.stroke();
-    // oars sweeping on both sides
-    ctx.strokeStyle = "#c8a46a"; ctx.lineWidth = 1.6; ctx.beginPath();   // all oars in one stroke
-    for (let i = 2; i < segs.length - 1; i += 2) { const p = segs[i]; if (!onScreen(p.x, p.y, r * 2)) continue; const q = segs[i - 1], a = Math.atan2(q.y - p.y, q.x - p.x), sw = Math.sin(tick * (s.boosting ? .3 : .15) + i) * .5;
-      for (let side = -1; side <= 1; side += 2) { const oa = a + side * (Math.PI / 2 + sw * side); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(oa) * r * 1.6, p.y + Math.sin(oa) * r * 1.6); } }
-    ctx.stroke();
-    // shields (only the ones on screen), with a red danger ring on any your prow is about to hit
-    const rad = r * .74, warned = [];
-    for (let i = segs.length - 1; i >= 1; i--) { const p = segs[i]; if (!onScreen(p.x, p.y, rad * 1.5)) continue; const q = segs[i - 1];
-      drawShieldFast(s.skin, p.x, p.y, rad, i, Math.atan2(q.y - p.y, q.x - p.x)); if (tick - p.warn < 4) warned.push(p); }
-    if (warned.length) { ctx.strokeStyle = `rgba(255,60,40,${.7 + .3 * Math.sin(tick * .5)})`; ctx.lineWidth = 3.5; ctx.beginPath();
-      for (const p of warned) { ctx.moveTo(p.x + rad * 1.25, p.y); ctx.arc(p.x, p.y, rad * 1.25, 0, 7); } ctx.stroke(); }
-    // prow + sail
-    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a);
-    ctx.fillStyle = "#5a3a1c"; ctx.beginPath(); ctx.moveTo(r * 2.1, 0); ctx.quadraticCurveTo(r * .7, -r * 1.15, -r * .7, -r * .85);
-    ctx.lineTo(-r * .7, r * .85); ctx.quadraticCurveTo(r * .7, r * 1.15, r * 2.1, 0); ctx.fill();
-    drawFig(ctx, s.fig, r, rogue);
-    ctx.fillStyle = s.skin.sail[0]; ctx.fillRect(-r * .2, -r * 1.35, r * .55, r * 2.7);                                // sail
-    ctx.fillStyle = s.skin.sail[1]; for (let k = -1; k <= 1; k++) ctx.fillRect(-r * .2, k * r * .9 - r * .2, r * .55, r * .4);
-    ctx.restore();
-    // ward glow
+    const warned = s.isPlayer ? null : [];
+    drawShipBody(ctx, s.skin, s.fig, segs, r, s.a, { vis: onScreen, boosting: s.boosting, rogue, warned });
+    if (warned && warned.length) { const rad = r * .74; ctx.strokeStyle = `rgba(255,60,40,${.7 + .3 * Math.sin(tick * .5)})`; ctx.lineWidth = 3.5; ctx.beginPath();
+      for (const p of warned) { ctx.moveTo(p.x + rad * 1.3, p.y); ctx.arc(p.x, p.y, rad * 1.3, 0, 7); } ctx.stroke(); }
     if (s.ward || s.invuln) { ctx.strokeStyle = "rgba(120,190,255,.7)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x, s.y, r * 2.3, 0, 7); ctx.stroke(); }
     if (s.buffs.magnet) { ctx.strokeStyle = "rgba(231,181,74,.18)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.x, s.y, 190, 0, 7); ctx.stroke(); }
     ctx.globalAlpha = 1;
-    ctx.fillStyle = s.isPlayer ? "#e7b54a" : rogue ? "#ff8a7a" : "rgba(255,255,255,.85)";
-    ctx.font = `700 ${Math.max(11, r * .85)}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillText(s.name, s.x, s.y - r * 2.2);
-  }
-  function drawShield(c, sk, x, y, rad, i, ang) {
-    const alt = i % 2, base = sk.pat === "rainbow" ? `hsl(${(i * 24 + tick * 2) % 360},70%,55%)` : alt ? sk.a : sk.b, other = alt ? sk.b : sk.a;
-    if (sk.glow) { c.fillStyle = sk.glow + "33"; c.beginPath(); c.arc(x, y, rad * 1.35, 0, 7); c.fill(); }
-    const ga = c.globalAlpha; if (sk.ghostly) c.globalAlpha = ga * .7;   // (bug fix: this used to keep multiplying, fading the ship to invisible)
-    c.fillStyle = base; c.beginPath(); c.arc(x, y, rad, 0, 7); c.fill();
-    c.save(); c.beginPath(); c.arc(x, y, rad, 0, 7); c.clip();
-    c.strokeStyle = other; c.fillStyle = other; c.lineWidth = rad * .28;
-    switch (sk.pat) {
-      case "cross": c.beginPath(); c.moveTo(x - rad, y); c.lineTo(x + rad, y); c.moveTo(x, y - rad); c.lineTo(x, y + rad); c.stroke(); break;
-      case "split": c.beginPath(); c.moveTo(x, y); c.arc(x, y, rad, ang, ang + Math.PI); c.fill(); break;
-      case "rings": c.lineWidth = rad * .16; c.beginPath(); c.arc(x, y, rad * .62, 0, 7); c.stroke(); break;
-      case "spiral": c.lineWidth = rad * .18; c.beginPath(); for (let k = 0; k < 16; k++) { const a = k * .7 + i, rr = rad * k / 16; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.stroke(); break;
-      case "bolt": c.lineWidth = rad * .2; c.beginPath(); c.moveTo(x - rad * .3, y - rad); c.lineTo(x + rad * .1, y - rad * .1); c.lineTo(x - rad * .15, y + rad * .05); c.lineTo(x + rad * .3, y + rad); c.stroke(); break;
-      case "skull": c.fillStyle = other; c.beginPath(); c.arc(x, y - rad * .1, rad * .5, 0, 7); c.fill(); c.fillRect(x - rad * .28, y + rad * .25, rad * .56, rad * .3);
-        c.fillStyle = base; c.beginPath(); c.arc(x - rad * .2, y - rad * .15, rad * .14, 0, 7); c.arc(x + rad * .2, y - rad * .15, rad * .14, 0, 7); c.fill(); break;
-      case "jack": c.fillStyle = `rgba(40,20,0,.9)`; c.beginPath(); c.moveTo(x - rad * .55, y - rad * .05); c.lineTo(x - rad * .15, y - rad * .05); c.lineTo(x - rad * .35, y - rad * .45); c.fill();
-        c.beginPath(); c.moveTo(x + rad * .55, y - rad * .05); c.lineTo(x + rad * .15, y - rad * .05); c.lineTo(x + rad * .35, y - rad * .45); c.fill(); c.fillRect(x - rad * .5, y + rad * .2, rad, rad * .22); break;
-      case "stripe": c.lineWidth = rad * .3; c.beginPath(); for (let k = -2; k <= 2; k++) { c.moveTo(x - rad + k * rad * .6, y + rad); c.lineTo(x + rad + k * rad * .6, y - rad); } c.stroke(); break;
-      case "snowflake": c.lineWidth = rad * .14; c.strokeStyle = "#5dade2"; c.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; c.moveTo(x - Math.cos(a) * rad * .7, y - Math.sin(a) * rad * .7); c.lineTo(x + Math.cos(a) * rad * .7, y + Math.sin(a) * rad * .7); } c.stroke(); break;
-      case "icing": c.strokeStyle = "#fff8ec"; c.lineWidth = rad * .14; c.beginPath(); for (let k = 0; k <= 24; k++) { const a = k / 24 * Math.PI * 2, rr = rad * (.68 + .08 * Math.sin(k * 3)); k ? c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : c.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.stroke(); break;
-      case "flame": c.fillStyle = `rgba(245,176,65,${.5 + .4 * Math.sin(tick * .2 + i)})`; c.beginPath(); c.arc(x, y + rad * .2, rad * .55, 0, 7); c.fill(); break;
-    }
-    c.restore();
-    c.strokeStyle = "#2b1a0b"; c.lineWidth = Math.max(1.2, rad * .12); c.beginPath(); c.arc(x, y, rad, 0, 7); c.stroke();
-    c.fillStyle = "#b8bcc2"; c.beginPath(); c.arc(x, y, rad * .26, 0, 7); c.fill();
-    c.globalAlpha = ga;
-  }
-  // in-game shields: each skin's two shield faces are painted once, then stamped. Animated patterns still draw live.
-  const shieldCache = new Map(), SR = 32;
-  function drawShieldFast(sk, x, y, rad, i, ang) {
-    if (sk.pat === "rainbow" || sk.pat === "flame") { drawShield(ctx, sk, x, y, rad, i, ang); return; }
-    const key = sk.id + (i % 2); let spr = shieldCache.get(key);
-    if (!spr) { spr = document.createElement("canvas"); const half = Math.ceil(SR * 1.4); spr.width = spr.height = half * 2;
-      drawShield(spr.getContext("2d"), { ...sk, ghostly: false }, half, half, SR, i % 2, 0); spr.k = half / SR; shieldCache.set(key, spr); }
-    const h = rad * spr.k, ga = ctx.globalAlpha; if (sk.ghostly) ctx.globalAlpha = ga * .7;
-    if (sk.pat === "split") { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.drawImage(spr, -h, -h, h * 2, h * 2); ctx.restore(); }
-    else ctx.drawImage(spr, x - h, y - h, h * 2, h * 2);
-    ctx.globalAlpha = ga;
+    // name tag with a dark outline so it reads over anything
+    ctx.font = `800 ${Math.max(11, r * .85)}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.65)"; ctx.strokeText(s.name, s.x, s.y - r * 2.3);
+    ctx.fillStyle = s.isPlayer ? "#ffd166" : rogue ? "#ff8a7a" : "#ffffff"; ctx.fillText(s.name, s.x, s.y - r * 2.3);
   }
   function drawFig(c, fig, r, rogue) {   // drawn in prow space: +x is forward
     const hx = r * 2.0, eye = rogue ? "#ff5544" : "#fff";
@@ -882,11 +1075,60 @@ body.shorts #recHint{display:block}
   $("recBtn").onclick = recToggle;
   addEventListener("keydown", e => { if (e.shiftKey && e.code === "KeyR" && SHORTS) recToggle(); });
 
+  /* ===================== high score board (real players only) =====================
+     Scores live in Firebase Firestore. Until FIREBASE_CONFIG is filled in, the board says it's not switched on yet —
+     it never shows made-up names. Add ?noscore=1 to the URL to play without posting (for testing / recording). */
+  const FIREBASE_CONFIG = null;   // ← paste your Firebase web config object here, e.g. { apiKey: "...", authDomain: "...", projectId: "...", ... }
+  const FB_VER = "10.12.2", POST_OK = !QS.has("noscore") && !SHORTS;
+  const lb = { db: null, loading: null, tab: "today", unsub: null, mine: new Set(JSON.parse(store.get("ls_mine") || "[]")) };
+  const dayKey = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const BAD = /(fuck|shit|bitch|cunt|nigg|fag|dick|cock|pussy|whore|slut|rape|nazi|hitler|porn|sex)/i;
+  const cleanName = n => { n = (n || "").replace(/[<>&"'`\\]/g, "").replace(/\s+/g, " ").trim().slice(0, 14); return !n || n === "You" || BAD.test(n.replace(/[^a-z]/gi, "")) ? "Nameless Viking" : n; };
+  function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+  function fbReady() {
+    if (!FIREBASE_CONFIG) return Promise.resolve(null);
+    if (lb.loading) return lb.loading;
+    return lb.loading = loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app-compat.js`)
+      .then(() => loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore-compat.js`))
+      .then(() => { firebase.initializeApp(FIREBASE_CONFIG); return lb.db = firebase.firestore(); })
+      .catch(() => null);
+  }
+  async function postScore(s) {
+    if (!POST_OK || (s.peak || s.len) < 10) return;
+    const db = await fbReady(); if (!db) return;
+    const day = dayKey(), doc = { name: cleanName(s.name), score: s.peak || s.len, kills: s.kills, day, skin: s.skin.id || "fjord", ts: firebase.firestore.FieldValue.serverTimestamp() };
+    try {
+      const a = await db.collection("scores").add(doc); const b = await db.collection("daily").doc(day).collection("scores").add(doc);
+      lb.mine.add(a.id); lb.mine.add(b.id); store.set("ls_mine", JSON.stringify([...lb.mine].slice(-60)));
+      if (lb.unsub) watchBoard();   // refresh highlight
+    } catch (e) { console.warn("score not saved", e); }
+  }
+  function boardEls() { return document.querySelectorAll("[data-lblist]"); }
+  function paintBoard(rows, note) {
+    boardEls().forEach(el => {
+      el.innerHTML = note ? `<li class="lbnote">${note}</li>` : rows.map((r, i) => `<li class="${lb.mine.has(r.id) ? "mine" : ""}"><span class="rk">${["🥇", "🥈", "🥉"][i] || i + 1}</span><span class="nm">${r.name.replace(/[<&]/g, "")}</span><span class="sc">${r.score}${r.kills ? ` <i>⚔️${r.kills}</i>` : ""}</span></li>`).join("");
+    });
+  }
+  async function watchBoard() {
+    if (lb.unsub) { lb.unsub(); lb.unsub = null; }
+    if (!FIREBASE_CONFIG) { paintBoard([], "🏆 The live scoreboard isn't switched on yet. Real scores will show here once it is."); return; }
+    paintBoard([], "Loading the scoreboard…");
+    const db = await fbReady(); if (!db) { paintBoard([], "Couldn't reach the scoreboard right now."); return; }
+    const q = (lb.tab === "today" ? db.collection("daily").doc(dayKey()).collection("scores") : db.collection("scores")).orderBy("score", "desc").limit(10);
+    lb.unsub = q.onSnapshot(snap => {   // live: new scores pop in while you're looking
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      paintBoard(rows, rows.length ? "" : lb.tab === "today" ? "No scores yet today. Set sail and claim #1!" : "No scores yet. Be the first legend!");
+    }, () => paintBoard([], "Couldn't reach the scoreboard right now."));
+  }
+  function stopBoard() { if (lb.unsub) { lb.unsub(); lb.unsub = null; } }
+  document.querySelectorAll("[data-lbtab]").forEach(b => b.onclick = () => { lb.tab = b.dataset.lbtab;
+    document.querySelectorAll("[data-lbtab]").forEach(x => x.classList.toggle("on", x.dataset.lbtab === lb.tab)); watchBoard(); });
+
   let last = performance.now();
   function frame(now) {
     if (now - last < 10) { requestAnimationFrame(frame); return; }   // 120Hz phones: run at 60fps instead of burning 2x the battery
     const f = clamp((now - last) / (1000 / 60), 0, 3); last = now;
-    step(f); drawSea(); drawIsles(); drawGold(); drawPowers();
+    step(f); drawSea(); drawIsles(); drawGold(); drawPowers(); drawParts();
     for (const s of ships) if (!s.isPlayer) drawShip(s); if (player) drawShip(player); drawBolts();
     drawSky(); drawShortsOverlay(); drawHud(); requestAnimationFrame(frame);
   }
@@ -900,14 +1142,17 @@ body.shorts #recHint{display:block}
   function showPlunder() { document.querySelectorAll("[data-plunder]").forEach(e => e.textContent = prof.plunder.toLocaleString()); }
   let wtab = "ships";
   function preview(cnv, sk, fig) {
-    const c = cnv.getContext("2d"), w = cnv.width, h = cnv.height; c.clearRect(0, 0, w, h);
-    const r = 17, pts = []; for (let i = 0; i < 9; i++) pts.push({ x: w * .8 - i * 21, y: h / 2 + Math.sin(i * .7) * 11 });
-    c.lineCap = "round"; c.strokeStyle = "#5a3a1c"; c.lineWidth = r * 1.4; c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.stroke();
-    for (let i = pts.length - 1; i >= 1; i--) drawShield(c, sk, pts[i].x, pts[i].y, r * .74, i, Math.PI);
-    c.save(); c.translate(pts[0].x, pts[0].y); c.fillStyle = "#5a3a1c"; c.beginPath(); c.moveTo(r * 2.1, 0); c.quadraticCurveTo(r * .7, -r * 1.15, -r * .7, -r * .85);
-    c.lineTo(-r * .7, r * .85); c.quadraticCurveTo(r * .7, r * 1.15, r * 2.1, 0); c.fill(); drawFig(c, fig, r, false);
-    c.fillStyle = sk.sail[0]; c.fillRect(-r * .2, -r * 1.35, r * .55, r * 2.7); c.fillStyle = sk.sail[1]; for (let k = -1; k <= 1; k++) c.fillRect(-r * .2, k * r * .9 - r * .2, r * .55, r * .4);
-    c.restore();
+    const c = cnv.getContext("2d"), w = cnv.width / 2, h = cnv.height / 2; c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, w, h);   // drawn at 2x so it's crisp on phones
+    const sea = c.createLinearGradient(0, 0, 0, h); sea.addColorStop(0, "#1a5f80"); sea.addColorStop(1, "#0d3a52"); c.fillStyle = sea; c.fillRect(0, 0, w, h);
+    const r = 20, segs = []; for (let i = 0; i < 7; i++) segs.push({ x: w * .66 - i * r * 1.05, y: h / 2 + 6 + Math.sin(i * .7) * 7, warn: -99 });
+    const a = Math.atan2(segs[0].y - segs[1].y, segs[0].x - segs[1].x);
+    // a few wake particles so you can see the trail effect
+    const wk = WAKES[sk.wake] || WAKES.foam, t = segs[segs.length - 1];
+    for (let k = 0; k < 14; k++) { const px = t.x - 6 - k * 4.5 + Math.sin(k * 2.3) * 4, py = t.y + Math.sin(k * 1.7) * 10, s = wk.s[0] + (k % 3) * (wk.s[1] - wk.s[0]) / 2;
+      c.globalAlpha = wk.a * (1 - k / 16); c.fillStyle = c.strokeStyle = wk.c ? wk.c[k % wk.c.length] : `hsl(${(k * 30) % 360},80%,65%)`;
+      c.beginPath(); if (wk.leaf) c.ellipse(px, py, s * 1.5, s * .7, k, 0, 7); else c.arc(px, py, s, 0, 7); c.fill(); }
+    c.globalAlpha = 1;
+    drawShipBody(c, sk, fig, segs, r, a, { boosting: false, rogue: false, warned: null });
   }
   function renderWard() {
     showPlunder();
@@ -917,8 +1162,8 @@ body.shorts #recHint{display:block}
       const how = (it.season ? SEASON_LABEL[it.season] + " · " : "") + (it.un.t === "free" ? "Starter" : it.un.t === "buy" ? `${it.un.cost.toLocaleString()} plunder` : it.un.label);
       const btn = eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` :
         it.un.t === "buy" ? `<button data-buy="${it.id}" ${prof.plunder < it.un.cost ? "disabled" : ""}>Buy · ${it.un.cost.toLocaleString()}</button>` : `<button disabled>🔒 Feat</button>`;
-      return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"}">${un ? "" : `<span class="tag">🔒</span>`}<canvas width="260" height="110" data-pv="${it.id}"></canvas>
-        <b>${it.name}</b><small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
+      return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"}">${un ? "" : `<span class="tag">🔒</span>`}<canvas width="520" height="220" data-pv="${it.id}"></canvas>
+        <b>${it.name}</b>${wtab === "ships" ? `<em class="wk">${WAKE_NAME[it.wake] || ""} trail</em>` : ""}<small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
     $("wardGrid").querySelectorAll("[data-pv]").forEach(cnv => { const id = cnv.dataset.pv;
       if (wtab === "ships") preview(cnv, SKINS.find(k => k.id === id), prof.eq.fig); else preview(cnv, curSkin, id); });
   }
@@ -933,6 +1178,7 @@ body.shorts #recHint{display:block}
   const openWard = () => { $("ward").classList.remove("hidden"); renderWard(); };
   $("wardBtn").onclick = openWard; $("wardBtn2").onclick = openWard; $("wardClose").onclick = () => { $("ward").classList.add("hidden"); showPlunder(); };
   showPlunder();
+  $("lbBtn").onclick = () => { const el = $("startLb"), open = el.classList.toggle("hidden") === false; if (open) watchBoard(); else stopBoard(); };
   $("name").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
   requestAnimationFrame(t => { last = t; frame(t); });
 })();

@@ -1,0 +1,25 @@
+rules_version = '2';
+// Longship.io high scores: anyone can read the boards and add a score.
+// Nobody can edit or delete scores, and every score must look like a real run.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function validScore(d) {
+      return d.keys().hasOnly(['name', 'score', 'kills', 'day', 'skin', 'ts'])
+        && d.keys().hasAll(['name', 'score', 'kills', 'day', 'skin', 'ts'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 15
+        && d.score is int && d.score >= 10 && d.score <= 20000
+        && d.kills is int && d.kills >= 0 && d.kills <= 1000
+        && d.day is string && d.day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.skin is string && d.skin.size() <= 20
+        && d.ts == request.time;
+    }
+    match /scores/{id} {
+      allow read: if true;
+      allow create: if validScore(request.resource.data);
+    }
+    match /daily/{day}/scores/{id} {
+      allow read: if true;
+      allow create: if validScore(request.resource.data) && request.resource.data.day == day;
+    }
+  }
+}
