@@ -1211,7 +1211,7 @@ body.shorts #recHint{display:block}
   /* ===================== high score board (real players only) =====================
      Scores live in Firebase Firestore. Until FIREBASE_CONFIG is filled in, the board says it's not switched on yet —
      it never shows made-up names. Add ?noscore=1 to the URL to play without posting (for testing / recording). */
-  const FIREBASE_CONFIG = null;   // ← paste your Firebase web config object here, e.g. { apiKey: "...", authDomain: "...", projectId: "...", ... }
+  const FIREBASE_CONFIG = { apiKey: "AIzaSyB2_bXBgJkOoWoo0Otzjba2u2i3XeWtzTs", authDomain: "longshipio.firebaseapp.com", projectId: "longshipio", storageBucket: "longshipio.firebasestorage.app", messagingSenderId: "439162243131", appId: "1:439162243131:web:874a0aec48a9e01a2ab41e", measurementId: "G-5T55KPP3L5" };   // public web config (safe to publish)
   const FB_VER = "10.12.2", POST_OK = !QS.has("noscore") && !SHORTS;
   const lb = { db: null, loading: null, tab: "today", unsub: null, mine: new Set(JSON.parse(store.get("ls_mine") || "[]")) };
   const dayKey = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
