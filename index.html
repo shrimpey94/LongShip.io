@@ -35,6 +35,9 @@ canvas{display:block;width:100vw;height:100vh}
 .board h4{margin:0 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
 .board .me{color:var(--gold)}
 .board .rogue{color:#ff8a7a}
+.board .human{color:#8fd3ff}
+.hud .lob{font:600 12px system-ui;opacity:.85;margin-top:2px}
+#lobby{margin:8px 0 0;font:700 14px system-ui;color:#8fd3ff;min-height:18px}#lobby b{color:#fff}
 #mini{position:fixed;right:12px;bottom:12px;width:120px;height:120px;border-radius:50%;background:#0007;border:2px solid #ffffff22}
 #toast{position:fixed;left:50%;top:18%;transform:translate(-50%,-10px);opacity:0;transition:all .3s;font:800 20px system-ui;text-shadow:0 2px 8px #000;pointer-events:none;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
@@ -127,6 +130,7 @@ body.shorts #sndBar{display:none}
 <div class="screen" id="start"><div class="card">
   <h1>LONG<span>SHIP</span>.io</h1>
   <div id="seasonTag"></div>
+  <div id="lobby"></div>
   <p>Gather drifting gold to grow your shield wall. If your prow touches another ship's shields or a rocky isle, you sink. Most raiders sail careful, but watch for the <b style="color:#ff8a7a">☠ rogues</b>.</p>
   <input id="name" maxlength="14" placeholder="Your Viking name" autocomplete="off">
   <br><button id="go">Set sail</button><br><button class="btn2" id="wardBtn">🎨 Wardrobe · <span class="plunder" data-plunder></span> plunder</button>
@@ -152,6 +156,7 @@ body.shorts #sndBar{display:none}
   <small><a href="/games/" target="_top" style="color:var(--gold)">Back to Busterrdust Games</a> · <a href="/games/vikingvale" target="_blank" rel="noopener" style="color:var(--gold)">Play VikingVale</a> · <a href="/games/privacy/" target="_blank" rel="noopener" style="color:var(--gold)">Privacy</a></small>
 </div></div>
 
+<script src="sim.js"></script>
 <script>
 (() => {
   /* ===================== seasons =====================
@@ -180,26 +185,10 @@ body.shorts #sndBar{display:none}
   const SHORTS = QS.get("shorts") === "1";
   if (SHORTS) document.body.classList.add("shorts");
 
-  /* ===================== tuning ===================== */
-  const W = 8000;                 // world size (was 3200)
-  const SPEED = 1.15, BOOST = 2.3; // px per frame at 60fps (was 2.6 / 5.2)
-  const TURN = 0.045;
-  const BASE_LEN = 8, BOTS = 34, ROGUES = 1 + ((Math.random() * 3) | 0);   // 1-3 rogue raiders
-  const GOLD_TARGET = 5000, ISLES = 22, POWER_TARGET = 34;
-  const POWERS = [   // rarity 0 common .. 3 legendary
-    { id: "oars",   icon: "⛵", name: "Swift Oars",     r: 0, w: 30, dur: 8,  note: "Row faster for free" },
-    { id: "magnet", icon: "🧲", name: "Odin's Pull",    r: 0, w: 26, dur: 12, note: "Nearby gold drifts to you" },
-    { id: "feast",  icon: "🍖", name: "Feast",          r: 1, w: 15, dur: 0,  note: "+12 shields" },
-    { id: "ward",   icon: "🛡️", name: "Thor's Ward",    r: 1, w: 13, dur: 20, note: "Survive one crash" },
-    { id: "ghost",  icon: "👻", name: "Ghost Ship",     r: 2, w: 7,  dur: 7,  note: "Sail through ships" },
-    { id: "mead",   icon: "🍺", name: "Mead of Plenty", r: 2, w: 6,  dur: 15, note: "Gold counts double" },
-    { id: "mjolnir",icon: "⚡", name: "Mjölnir",        r: 3, w: 3,  dur: 0,  note: "Lightning sinks the nearest rival" },
-  ];
+  /* ===================== rules (shared with the lobby server: see sim.js) ===================== */
+  const Sim = window.LongshipSim;
+  const { W, BASE_LEN, POWERS, LOOT, GEM_HUES, radius } = Sim;
   const RCOL = ["#d5d8dc", "#58d68d", "#5dade2", "#f5b041"];
-  // loot drifting at sea (value = how much it grows you; 3 value = 1 shield)
-  const LOOT = { coin: { v: 1, w: 80 }, silver: { v: 2, w: 9 }, amber: { v: 3, w: 5 }, gem: { v: 5, w: 3.5 }, goblet: { v: 8, w: 1.6 }, horn: { v: 12, w: .7 }, chest: { v: 25, w: 0 } };
-  const LOOT_SPAWN = Object.entries(LOOT).filter(([, o]) => o.w > 0), LOOT_W = LOOT_SPAWN.reduce((a, [, o]) => a + o.w, 0);
-  const GEM_HUES = [350, 140, 210, 280];
   /* ship skins — every skin has its own full look:
      a/b = shield colors · shape = shield shape · pat = shield pattern · hull = [outline, planks, trim]
      sail = [cloth, stripe] · sailPat = stripe layout · emb = sail emblem · wake = trail behind the ship */
@@ -280,11 +269,6 @@ body.shorts #sndBar{display:none}
 
   const inSeason = it => !it.season || it.season === SEASON;
   const ROGUE_SKIN = { id: "rogue", a: "#1b1b1b", b: "#c0392b", shape: "kite", pat: "cross", hull: ["#050505", "#1f1f1f", "#c0392b"], sail: ["#1b1b1b", "#c0392b"], sailPat: "torn", emb: "skull", embC: "#e8e8e8", wake: "crimson" };
-  const NAMES = ["Ragnhild", "Bjorn", "Sigrid", "Ulf", "Astrid", "Leif", "Freydis", "Hakon", "Gunnar", "Thyra", "Eirik", "Solveig", "Knut", "Ingrid",
-    "Halfdan", "Brynja", "Orm", "Dagny", "Sven", "Yrsa", "Torvald", "Gudrun", "Arne", "Hilda", "Rolf", "Signy", "Asger", "Liv"];
-  const ROGUE_NAMES = ["Hrafn the Grim", "Skarde Bloodaxe", "Ivar Boneless", "Grima Wolfsbane"];
-  const COLORS = [["#c0392b", "#f5d76e"], ["#2e86c1", "#f4f6f7"], ["#27ae60", "#f9e79f"], ["#8e44ad", "#f5cba7"], ["#d35400", "#fdebd0"],
-                  ["#16a085", "#fadbd8"], ["#1f618d", "#f9e79f"], ["#7d3c98", "#d5f5e3"], ["#a04000", "#d6dbdf"], ["#117864", "#f6ddcc"]];
 
   /* ===================== setup ===================== */
   const cv = document.getElementById("c"), ctx = cv.getContext("2d");
@@ -317,19 +301,6 @@ body.shorts #sndBar{display:none}
   let warnIsle = null;
   let ships = [], gold = [], powers = [], isles = [], bolts = [], player = null, running = false, tick = 0;
   const input = { x: 0, y: 0, boost: false, active: false }, cam = { x: W / 2, y: W / 2, z: 1 };
-
-  /* ----- spatial grids: fixed cell arrays that are emptied and refilled each frame.
-     No new Maps or objects per frame, so the phone's garbage collector stays quiet (less heat). ----- */
-  const CELL = 160, GN = Math.ceil(W / CELL);
-  const mkGrid = () => Array.from({ length: GN * GN }, () => []);
-  const segGrid = mkGrid(), goldGrid = mkGrid(), segUsed = [], goldUsed = [];
-  function gridClear(g, used) { for (let j = 0; j < used.length; j++) g[used[j]].length = 0; used.length = 0; }
-  function gridAdd(g, used, x, y, v) { const k = clamp((y / CELL) | 0, 0, GN - 1) * GN + clamp((x / CELL) | 0, 0, GN - 1), a = g[k]; if (!a.length) used.push(k); a.push(v); }
-  function gridNear(g, x, y, r, fn) {
-    const x0 = clamp(((x - r) / CELL) | 0, 0, GN - 1), x1 = clamp(((x + r) / CELL) | 0, 0, GN - 1);
-    const y0 = clamp(((y - r) / CELL) | 0, 0, GN - 1), y1 = clamp(((y + r) / CELL) | 0, 0, GN - 1);
-    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const a = g[cy * GN + cx]; for (let j = 0; j < a.length; j++) if (fn(a[j]) === false) return; }
-  }
 
   /* ===================== sound =====================
      Every sound is made live with Web Audio (no audio files to download). Music is a quiet Viking loop:
@@ -402,209 +373,64 @@ body.shorts #sndBar{display:none}
   $("musBtn").onclick = () => { audioInit(); snd.music = !snd.music; store.set("ls_music", snd.music ? "1" : "0"); if (snd.mus) snd.mus.gain.setTargetAtTime(snd.music ? .55 : 0, snd.ac.currentTime, .1); if (snd.music && snd.ac) snd.next = snd.ac.currentTime + .05; paintSnd(); };
   paintSnd();
 
-  /* ===================== world ===================== */
-  function makeIsles() {
-    isles = [];
-    for (let i = 0; i < ISLES; i++) {
-      const r = rnd(70, 190), x = rnd(400, W - 400), y = rnd(400, W - 400);
-      if (isles.some(o => Math.hypot(o.x - x, o.y - y) < o.r + r + 400)) { i--; continue; }
-      const pts = []; for (let k = 0; k < 14; k++) pts.push(r * rnd(.82, 1.12));
-      isles.push({ x, y, r, pts, trees: Array.from({ length: (r / 35) | 0 }, () => [rnd(-.5, .5) * r, rnd(-.5, .5) * r]) });
-    }
+  /* ===================== the world (rules live in sim.js, shared with the lobby server) ===================== */
+  let world = null;   // the bots-only sea when offline; null when connected to a real lobby
+  const hitIsle = (x, y, pad) => Sim.hitIsle(isles, x, y, pad);
+  // turn a ship's look ids into the art the browser draws with
+  function dress(s) {
+    s.skin = SKINS.find(k => k.id === s.skinId) || BOSS_SKINS[s.skinId] || (s.skinId === "rogue" ? ROGUE_SKIN : SKINS[0]);
+    const t = s.trailId && TRAILS.find(x => x.id === s.trailId); s.trail = t && t.wake ? t : null;
+    if (!s.buffs) s.buffs = {}; if (!s.segs) s.segs = []; if (!s.path) s.path = [];
   }
-  const inIsle = (x, y, pad) => isles.some(o => d2(x, y, o.x, o.y) < (o.r + pad) ** 2);   // generous circle: used for spawning only
-  // the real, drawn sand line of an isle in the direction of (x, y)
-  function coast(o, x, y) {
-    let a = Math.atan2(y - o.y, x - o.x); if (a < 0) a += Math.PI * 2;
-    const n = o.pts.length, f = a / (Math.PI * 2) * n, k = f | 0, t = f - k;
-    return o.pts[k % n] * (1 - t) + o.pts[(k + 1) % n] * t;
+  function myLook() {
+    return { skinId: (SKINS.find(k => k.id === prof.eq.skin && unlocked(k)) || SKINS[0]).id,
+             fig: (FIGS.find(f => f.id === prof.eq.fig && unlocked(f)) || FIGS[0]).id,
+             trailId: (TRAILS.find(t => t.id === prof.eq.trail && unlocked(t)) || {}).id || null };
   }
-  // ships only run aground when they actually touch the sand you can see
-  function hitIsle(x, y, pad) {
-    for (const o of isles) { const dd = d2(x, y, o.x, o.y); if (dd > (o.r * 1.13 + pad) ** 2) continue; if (dd < (coast(o, x, y) + pad) ** 2) return o; }
-    return null;
-  }
-  function freeSpot(pad, edge = 300) { for (let t = 0; t < 60; t++) { const x = rnd(edge, W - edge), y = rnd(edge, W - edge); if (!inIsle(x, y, pad)) return [x, y]; } return [W / 2, W / 2]; }
-  function spawnGold(n, x, y, spread, big) {
-    for (let i = 0; i < n; i++) {
-      let gx, gy;
-      if (x === undefined) { [gx, gy] = freeSpot(20); gx += rnd(-200, 200); gy += rnd(-200, 200); }
-      else { gx = x + rnd(-spread, spread); gy = y + rnd(-spread, spread); }
-      gx = clamp(gx, 30, W - 30); gy = clamp(gy, 30, W - 30); if (inIsle(gx, gy, 6)) continue;
-      let type = big || "coin";
-      if (x === undefined) { let pick = Math.random() * LOOT_W; for (const [k, o] of LOOT_SPAWN) { pick -= o.w; if (pick <= 0) { type = k; break; } } }
-      addLoot(type, gx, gy, x !== undefined && big ? 1 : 0);
-    }
-  }
-  function addLoot(type, x, y, glow) {
-    gold.push({ x, y, type, v: LOOT[type].v, t: Math.random() * 6, h: GEM_HUES[(Math.random() * 4) | 0], glow: glow ? 60 * 25 : 0 });
-  }
-  // a sunk ship spills its plunder along its hull: bigger ships leave bigger piles with chests and treasure
-  function dropPlunder(s) {
-    let total = Math.round(s.len * 3 * .8), i = 0;
-    const segs = s.segs.length ? s.segs : [{ x: s.x, y: s.y }];
-    const chests = Math.floor(s.len / 45);
-    for (let c = 0; c < chests && total >= 25; c++) { const p = segs[Math.floor(Math.random() * segs.length)];
-      if (!inIsle(p.x, p.y, 10)) { addLoot("chest", p.x + rnd(-10, 10), p.y + rnd(-10, 10), 1); total -= 25; } }
-    const order = ["horn", "goblet", "gem", "amber", "silver", "coin"];
-    let guard = 0;
-    while (total > 0 && guard++ < 2000) {
-      const p = segs[i++ % segs.length], room = order.filter(k => LOOT[k].v <= total);
-      const k = Math.random() < .55 ? "coin" : room[Math.floor(Math.random() * room.length)] || "coin";
-      const x = clamp(p.x + rnd(-14, 14), 20, W - 20), y = clamp(p.y + rnd(-14, 14), 20, W - 20);
-      if (!inIsle(x, y, 6)) addLoot(k, x, y, 1); total -= LOOT[k].v;
-    }
-  }
-  function spawnPower() {
-    let tot = POWERS.reduce((a, p) => a + p.w, 0), pick = Math.random() * tot, p = POWERS[0];
-    for (const q of POWERS) { pick -= q.w; if (pick <= 0) { p = q; break; } }
-    const [x, y] = freeSpot(60);
-    powers.push({ x, y, p, life: 60 * rnd(40, 75), t: Math.random() * 6 });
+  function newOfflineWorld() {
+    world = new Sim.World({ season: SEASON, hooks: {
+      add: dress,
+      sink: (s, by, how) => { if (s === player) onPlayerSunk({ by: by ? by.name : null, how, peak: s.peak || s.len, kills: s.kills }); else if (by === player) onKill(s); },
+      ward: s => { if (s === player) onWardSave(); },
+      grant: (s, p, hit) => { if (s === player) onGrant(p, hit); },
+      eat: (s, g) => { if (s === player) onEat(g.v); },
+      returned: n => toast(`${n.name} has returned...`),
+    } });
+    ships = world.ships; gold = world.gold; powers = world.powers; isles = world.isles; bolts = world.bolts;
   }
 
-  function makeShip(name, kind) {
-    const [x, y] = freeSpot(260, 700), a = rnd(0, Math.PI * 2);
-    const pool = SKINS.filter(inSeason), seasonalRogue = TH && (SKINS.find(k => k.id === TH.rogueSkin) || BOSS_SKINS[TH.rogueSkin]);
-    const skin = kind === "rogue" ? (seasonalRogue || ROGUE_SKIN) : kind === "player" ? (SKINS.find(k => k.id === prof.eq.skin && unlocked(k)) || SKINS[0]) : pool[(Math.random() * pool.length) | 0];
-    const figPool = FIGS.filter(f => inSeason(f) && f.id !== "skull" && (!FIG_FX[f.id] || Math.random() < .35));
-    const fig = kind === "rogue" ? "skull" : kind === "player" ? (FIGS.find(f => f.id === prof.eq.fig && unlocked(f)) || FIGS[0]).id : figPool[(Math.random() * figPool.length) | 0].id;
-    const trail = kind === "player" ? TRAILS.find(t => t.id === prof.eq.trail && unlocked(t)) : kind === "bot" && Math.random() < .3 ? TRAILS.filter(t => inSeason(t) && t.wake)[(Math.random() * 14) | 0] : null;
-    const s = { trail: trail && trail.wake ? trail : null, name, kind, isPlayer: kind === "player", x, y, a, target: a, len: BASE_LEN, path: [], skin, fig, alive: true, score: 0, kills: 0, peak: BASE_LEN,
-                think: 0, boosting: false, fleeT: 0, buffs: {}, ward: 0, segs: [] };
-    for (let i = 160; i >= 1; i--) s.path.push({ x: x - Math.cos(a) * i * PSTEP, y: y - Math.sin(a) * i * PSTEP });
-    return s;
+  /* ----- what happens to YOU (the same in bots-only mode and in a real lobby) ----- */
+  function onEat(v) { sfx.coin(v); if (TH && player) { player.treats = (player.treats || 0) + 1; if (player.treats === 150) achieve(TH.treatAch); } }
+  function onWardSave() { toast("🛡️ Thor's Ward saved you!"); sfx.clang(); }
+  function onGrant(p, hit) { toast(`${p.icon} ${p.name}!`, p.note); if (p.id === "mjolnir") { sfx.thunder(); if (hit) achieve("mjolnir"); } else sfx.power(p.r); }
+  function onKill(v) {   // v: the ship you sank (name, kind, boss)
+    prof.stats.sinks++; if (v.kind === "rogue") achieve("rogue");
+    if (v.boss && TH) { achieve(TH.boss.ach); setTimeout(() => toast(`🏆 You sank ${v.name}!`, "Its treasure is yours"), 300); } else toast(`⚔️ ${v.name} sank!`);
+    if (player && player.kills >= 5) achieve("kills5"); if (prof.stats.sinks >= 25) achieve("sinks25"); saveProf(); sfx.horn();
   }
-  const PSTEP = 3;   // the wake is remembered as a point every 3px (was every frame)
-  const radius = s => 9 + Math.min(15, Math.sqrt(s.len) * 1.25);
-  const gap = s => 11 * radius(s) / 11;
-  // places shields along the wake. Reuses the same segment objects every frame (no garbage),
-  // and tracks a bounding box so off-screen ships can be skipped when drawing.
-  function buildSegs(s) {
-    const P = s.path, segs = s.segs, sp = gap(s);
-    let n = 0, px = s.x, py = s.y, need = sp, k = P.length - 1;
-    let o = segs[0] || (segs[0] = { s, i: 0, x: 0, y: 0, warn: -99 }); o.x = px; o.y = py; o.s = s; n = 1;
-    let bx0 = px, bx1 = px, by0 = py, by1 = py;
-    while (n <= s.len && k >= 0) {
-      const q = P[k], dx = q.x - px, dy = q.y - py, d = Math.sqrt(dx * dx + dy * dy);
-      if (d >= need) { const t = need / d; px += dx * t; py += dy * t; need = sp;
-        o = segs[n] || (segs[n] = { s, i: n, x: 0, y: 0, warn: -99 }); o.x = px; o.y = py; o.s = s; n++;
-        if (px < bx0) bx0 = px; else if (px > bx1) bx1 = px; if (py < by0) by0 = py; else if (py > by1) by1 = py; }
-      else { need -= d; px = q.x; py = q.y; k--; }
-    }
-    segs.length = n; s.bx0 = bx0; s.bx1 = bx1; s.by0 = by0; s.by1 = by1;
-    if (k > 200) P.splice(0, k - 40);   // forget wake older than the stern, in batches
+  function onPlayerSunk(r) {   // r: { by, how, peak, kills }
+    const s = player; if (s) { s.alive = false; s.kills = r.kills; s.peak = r.peak; }
+    sfx.sunk(); sfx.boost(false); lastRun = { score: r.peak, kills: r.kills, skin: s.skin, fig: s.fig, trail: s.trail };
+    running = false; const best = Math.max(+store.get("ls_best") || 0, r.peak); store.set("ls_best", best);
+    const earned = r.peak + r.kills * 25; prof.plunder += earned; prof.stats.runs++; if (prof.stats.runs >= 10) achieve("runs10");
+    if (TH) { prof.stats[TH.runsKey] = (prof.stats[TH.runsKey] || 0) + 1; if (prof.stats[TH.runsKey] >= 3) achieve(TH.runsAch); } saveProf(); showPlunder();
+    const by = String(r.by || "a ship").replace(/[<&]/g, "");
+    const why = r.how === "rock" ? "Ran aground on a rocky isle." : r.how === "edge" ? "Sailed off the edge of the world." : r.how === "bolt" ? "Struck by lightning." : `Crashed into <b>${by}</b>.`;
+    $("overText").innerHTML = `Biggest shield wall: <b>${r.peak}</b> · Raiders sunk: <b>${r.kills}</b><br>${why}<br>Best ever: <b>${best}</b>` +
+      `<br><span class="plunder">+${earned} plunder</span> <span style="opacity:.75">(${r.peak} wall + ${r.kills * 25} for sinks)</span>`;
+    postScore({ name: s.name, peak: r.peak, len: r.peak, kills: r.kills, skin: s.skin }); setTimeout(() => { $("over").classList.remove("hidden"); watchBoard(); }, 900);
   }
 
   function start() {
     const nm = ($("name").value.trim() || "You").slice(0, 14); store.set("ls_name", nm);
-    setupWorld(); player = makeShip(nm, "player"); ships.push(player);
-    cam.x = player.x; cam.y = player.y; cam.z = 1; running = true;
     $("start").classList.add("hidden"); $("over").classList.add("hidden"); stopBoard();
     audioInit(); sfx.start();
     if (TH) toast(TH.toast[0], TH.toast[1]); else toast("⛵ Set sail!", "Gather gold. Avoid shields and rocks.");
-  }
-  function setupWorld() {
-    ships = []; gold = []; powers = []; bolts = []; makeIsles(); spawnGold(GOLD_TARGET);
-    for (let i = 0; i < POWER_TARGET; i++) spawnPower();
-    const pool = NAMES.slice().sort(() => Math.random() - .5);
-    for (let i = 0; i < BOTS; i++) { const b = makeShip(pool[i % pool.length], "bot"); b.len = BASE_LEN + ((Math.random() * 40) | 0); ships.push(b); }
-    const rp = (TH ? TH.rogues : ROGUE_NAMES.map(n => "☠ " + n)).slice().sort(() => Math.random() - .5);
-    for (let i = 0; i < ROGUES; i++) { const r = makeShip(rp[i], "rogue"); r.len = 30 + ((Math.random() * 30) | 0); ships.push(r); }
-    if (TH) ships.push(makeBoss());
-  }
-
-  function makeBoss() {
-    const b = makeShip(TH.boss.name, "rogue"); b.boss = true; b.len = TH.boss.len;
-    b.skin = SKINS.find(k => k.id === TH.boss.skin) || BOSS_SKINS[TH.boss.skin]; b.fig = TH.boss.fig; return b;
-  }
-  function sink(s, by, how) {
-    if (!s.alive) return;
-    if (s.ward > 0 && how !== "bolt") { s.ward = 0; delete s.buffs.ward; s.invuln = 90; if (s.isPlayer) { toast("🛡️ Thor's Ward saved you!"); sfx.clang(); } return; }
-    s.alive = false;
-    dropPlunder(s);
-    if (by) { by.kills++;
-      if (by.isPlayer) { prof.stats.sinks++; if (s.kind === "rogue") achieve("rogue"); if (s.boss && TH) { achieve(TH.boss.ach); setTimeout(() => toast(`🏆 You sank ${s.name}!`, "Its treasure is yours"), 300); } if (by.kills >= 5) achieve("kills5"); if (prof.stats.sinks >= 25) achieve("sinks25"); saveProf(); } }
-    if (by && by.isPlayer && !s.isPlayer) sfx.horn();
-    if (s.isPlayer) {
-      sfx.sunk(); sfx.boost(false); lastRun = { score: s.peak || s.len, kills: s.kills, skin: s.skin, fig: s.fig, trail: s.trail };
-      running = false; const best = Math.max(+store.get("ls_best") || 0, s.peak || s.len); store.set("ls_best", best);
-      const earned = (s.peak || s.len) + s.kills * 25; prof.plunder += earned; prof.stats.runs++; if (prof.stats.runs >= 10) achieve("runs10");
-      if (TH) { prof.stats[TH.runsKey] = (prof.stats[TH.runsKey] || 0) + 1; if (prof.stats[TH.runsKey] >= 3) achieve(TH.runsAch); } saveProf(); showPlunder();
-      const why = how === "rock" ? "Ran aground on a rocky isle." : how === "edge" ? "Sailed off the edge of the world." : how === "bolt" ? "Struck by lightning." : `Crashed into <b>${by ? by.name : "a ship"}</b>.`;
-      $("overText").innerHTML = `Biggest shield wall: <b>${s.peak || s.len}</b> · Raiders sunk: <b>${s.kills}</b><br>${why}<br>Best ever: <b>${best}</b>` +
-        `<br><span class="plunder">+${earned} plunder</span> <span style="opacity:.75">(${s.peak || s.len} wall + ${s.kills * 25} for sinks)</span>`;
-      postScore(s); setTimeout(() => { $("over").classList.remove("hidden"); watchBoard(); }, 900);
-    } else {
-      if (by && by.isPlayer) toast(`⚔️ ${s.name} sank!`);
-      setTimeout(() => { const i = ships.indexOf(s); if (i < 0) return; const n = s.boss ? makeBoss() : makeShip(s.name, s.kind);
-        if (!s.boss) { n.len = s.kind === "rogue" ? 25 : BASE_LEN + ((Math.random() * 15) | 0); if (s.kind === "rogue") { n.skin = s.skin; } }
-        ships[i] = n; if (s.boss) toast(`${n.name} has returned...`); }, s.boss ? 45000 : 4000);
-    }
-  }
-
-  /* ===================== bot brains =====================
-     Every bot scores 13 possible headings and picks the safest one that still leads somewhere useful.
-     Careful raiders: never chase ships, flee from anything heading at them, only boost to escape.
-     Rogues: same survival instincts, but they cut in front of smaller ships and boost to do it. */
-  function danger(b, x, y, margin) {
-    if (x < 120 || y < 120 || x > W - 120 || y > W - 120) return 3;
-    for (const o of isles) if (d2(x, y, o.x, o.y) < (o.r + margin + 30) ** 2) return 3;
-    let hit = 0;
-    gridNear(segGrid, x, y, margin + 30, v => {
-      if (v.s === b && v.i < 10) return;
-      const rr = (radius(v.s) + margin) ** 2;
-      if (d2(x, y, v.x, v.y) < rr) { hit = (v.s.buffs.ghost || v.s.solidify) && v.s !== b ? 0 : 2; return false; }
-    });
-    return hit;
-  }
-  function botThink(b) {
-    if (--b.think > 0) return;
-    const far = d2(b.x, b.y, cam.x, cam.y) > 1500 * 1500;   // nobody can see this bot: think less often, check fewer headings
-    b.think = (far ? 12 : 5) + ((Math.random() * 4) | 0);
-    const r = radius(b), rogue = b.kind === "rogue";
-    // 1) goal direction
-    let goal = null, why = "wander";
-    // threats: heads near us pointing our way (bigger ones scarier)
-    let threat = null, tBest = 1e9;
-    for (const o of ships) { if (o === b || !o.alive) continue; const dd = d2(o.x, o.y, b.x, b.y);
-      if (dd > 380 * 380) continue;
-      const toMe = Math.atan2(b.y - o.y, b.x - o.x), facing = Math.abs(angDiff(o.a, toMe)) < .7;
-      if ((facing || o.kind === "rogue") && (o.len >= b.len * .7 || o.kind === "rogue") && dd < tBest) { tBest = dd; threat = o; } }
-    if (threat && !rogue) { goal = Math.atan2(b.y - threat.y, b.x - threat.x); why = "flee"; b.fleeT = 50; }
-    else if (rogue) {
-      let prey = null, pBest = 1e9;
-      for (const o of ships) { if (o === b || !o.alive || o.kind === "rogue") continue; if (o.len > b.len + 15) continue;
-        const dd = d2(o.x, o.y, b.x, b.y); if (dd < 700 * 700 && dd < pBest) { pBest = dd; prey = o; } }
-      if (prey) { const lead = 90 + radius(prey) * 3; goal = Math.atan2(prey.y + Math.sin(prey.a) * lead - b.y, prey.x + Math.cos(prey.a) * lead - b.x); why = "hunt"; }
-    }
-    if (goal === null) {
-      // safest nearby gold / power-up: prefer ones away from other ships
-      let best = null, score = 1e9;
-      gridNear(goldGrid, b.x, b.y, 420, g => { const dd = d2(g.x, g.y, b.x, b.y); const s = dd / (1 + g.v * .4); if (s < score) { score = s; best = g; } });
-      for (const p of powers) { const dd = d2(p.x, p.y, b.x, b.y); if (dd < 500 * 500 && dd * .3 < score) { score = dd * .3; best = p; } }
-      if (best) { goal = Math.atan2(best.y - b.y, best.x - b.x); why = "feed"; }
-      else { b.wander = (b.wander ?? b.a) + rnd(-.4, .4); goal = b.wander; }
-    }
-    // 2) pick the safest heading close to the goal
-    let bestA = goal, bestScore = -1e9;
-    for (let k = -6; k <= 6; k += far ? 2 : 1) {
-      const a = b.a + k * .26, cost = Math.abs(angDiff(a, goal)) * 1.2 + Math.abs(k) * .05;
-      let risk = 0;
-      for (const dist of [r * 1.6 + 20, r * 2.4 + 55, r * 3.2 + 100, r * 4 + 160]) {
-        const dg = danger(b, b.x + Math.cos(a) * dist, b.y + Math.sin(a) * dist, r * .9 + 10);
-        risk += dg * (dist < 100 ? 6 : dist < 170 ? 3 : 1.4);
-      }
-      // keep clear of other prows' projected paths
-      for (const o of ships) { if (o === b || !o.alive) continue; if (d2(o.x, o.y, b.x, b.y) > 300 * 300) continue;
-        const px = o.x + Math.cos(o.a) * 70, py = o.y + Math.sin(o.a) * 70, qx = b.x + Math.cos(a) * 70, qy = b.y + Math.sin(a) * 70;
-        if (d2(px, py, qx, qy) < (r + radius(o) + 30) ** 2) risk += rogue ? 1 : 4; }
-      const sc = -risk * 10 - cost;
-      if (sc > bestScore) { bestScore = sc; bestA = a; }
-    }
-    b.target = bestA;
-    // 3) boost only to escape (careful) or to close a cut-off (rogue)
-    const canBoost = b.len > BASE_LEN + 6;
-    b.boosting = canBoost && ((why === "flee" && tBest < 200 * 200) || (rogue && why === "hunt" && Math.random() < .5) || bestScore < -40);
+    if (net.on) { netSail(nm); return; }
+    newOfflineWorld();
+    player = world.makeShip(Object.assign({ name: nm, kind: "player" }, myLook())); player.isPlayer = true; world.addShip(player);
+    cam.x = player.x; cam.y = player.y; cam.z = 1; running = true;
+    if (ONLINE_OK && !net.tried) netConnect(1);   // the server may be back: try a real lobby next voyage
   }
 
   /* ===================== input ===================== */
@@ -623,91 +449,178 @@ body.shorts #sndBar{display:none}
   addEventListener("keydown", e => { if (e.code === "Space") { input.boost = true; e.preventDefault(); } keys.add(e.code); });
   addEventListener("keyup", e => { if (e.code === "Space") input.boost = false; keys.delete(e.code); });
 
-  /* ===================== power-ups ===================== */
-  function grant(s, p) {
-    if (p.id === "feast") s.len += 12;
-    else if (p.id === "ward") { s.ward = 1; s.buffs.ward = { t: p.dur * 60, max: p.dur * 60 }; }
-    else if (p.id === "mjolnir") {
-      let tgt = null, best = 1e9;
-      for (const o of ships) { if (o === s || !o.alive) continue; const dd = d2(o.x, o.y, s.x, s.y); if (dd < 900 * 900 && dd < best) { best = dd; tgt = o; } }
-      if (tgt) { bolts.push({ x1: s.x, y1: s.y, x2: tgt.x, y2: tgt.y, t: 30 }); sink(tgt, s, "bolt"); if (s.isPlayer) achieve("mjolnir"); }
-    } else s.buffs[p.id] = { t: p.dur * 60, max: p.dur * 60 };
-    if (s.isPlayer) { toast(`${p.icon} ${p.name}!`, p.note); if (p.id === "mjolnir") sfx.thunder(); else sfx.power(p.r); }
-  }
   let toastT = 0;
   let canvasToast = null;
   function toast(a, b) { canvasToast = { a: a.replace(/<[^>]+>/g, ""), b: (b || "").replace(/<[^>]+>/g, ""), t: 120 }; const t = $("toast"); t.innerHTML = a + (b ? `<small>${b}</small>` : ""); t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1800); }
 
-  /* ===================== simulation ===================== */
+  /* ===================== each frame ===================== */
+  const cGrid = new Sim.Grid();   // the browser's own grid of shields, for the danger warning
+  function readInput() {
+    let kx = 0, ky = 0; if (keys.has("ArrowLeft") || keys.has("KeyA")) kx--; if (keys.has("ArrowRight") || keys.has("KeyD")) kx++;
+    if (keys.has("ArrowUp") || keys.has("KeyW")) ky--; if (keys.has("ArrowDown") || keys.has("KeyS")) ky++;
+    if (kx || ky) { input.x = kx; input.y = ky; input.active = true; }
+    if (input.active) player.target = Math.atan2(input.y, input.x);
+    player.boosting = input.boost;
+    sfx.boost((player.boosting && player.len > BASE_LEN) || !!player.buffs.oars);
+  }
   function step(f) {   // f = frames elapsed at 60fps (keeps speed the same on 60Hz and 120Hz screens)
     tick += f;
-    if (running && player.alive) {
-      let kx = 0, ky = 0; if (keys.has("ArrowLeft") || keys.has("KeyA")) kx--; if (keys.has("ArrowRight") || keys.has("KeyD")) kx++;
-      if (keys.has("ArrowUp") || keys.has("KeyW")) ky--; if (keys.has("ArrowDown") || keys.has("KeyS")) ky++;
-      if (kx || ky) { input.x = kx; input.y = ky; input.active = true; }
-      if (input.active) player.target = Math.atan2(input.y, input.x);
-      player.boosting = input.boost;
-      sfx.boost((player.boosting && player.len > BASE_LEN) || !!player.buffs.oars);
-    }
-    // grids
-    gridClear(segGrid, segUsed); gridClear(goldGrid, goldUsed);
-    for (const s of ships) if (s.alive) { const sg = s.segs; for (let j = 0; j < sg.length; j++) gridAdd(segGrid, segUsed, sg[j].x, sg[j].y, sg[j]); }
-    for (let j = 0; j < gold.length; j++) gridAdd(goldGrid, goldUsed, gold[j].x, gold[j].y, gold[j]);
-
-    for (const s of ships) {
-      if (!s.alive) continue;
-      if (!s.isPlayer) botThink(s);
-      for (const k in s.buffs) { s.buffs[k].t -= f; if (s.buffs[k].t <= 0) { delete s.buffs[k]; if (k === "ward") s.ward = 0; if (k === "ghost") s.solidify = 75; } }
-      if (s.invuln) s.invuln = Math.max(0, s.invuln - f);
-      if (s.solidify) s.solidify = Math.max(0, s.solidify - f);   // a ghost fading back in can't sink anyone (or be sunk) for ~1s
-      if (s.boss && SEASON === "halloween") { s.phase = (s.phase || 0) + f; if (s.phase > 540) { s.phase = 0; s.buffs.ghost = { t: 180, max: 180 }; } }
-      const free = !!s.buffs.oars, boost = (s.boosting && s.len > BASE_LEN) || free;
-      const turn = (TURN - Math.min(.015, s.len / 9000)) * f;
-      s.a += clamp(angDiff(s.a, s.target), -turn, turn);
-      const sp = (boost ? BOOST : SPEED) * (free ? 1.15 : 1) * f;
-      s.x += Math.cos(s.a) * sp; s.y += Math.sin(s.a) * sp;
-      if (s.boosting && !free && s.len > BASE_LEN) { s.drop = (s.drop || 0) + f; if (s.drop >= 22) { s.drop = 0; s.len--; const t = s.segs[s.segs.length - 1]; if (t) addLoot("coin", t.x, t.y, 0); } }
-      const lp = s.path[s.path.length - 1]; if (!lp || d2(lp.x, lp.y, s.x, s.y) >= PSTEP * PSTEP) s.path.push({ x: s.x, y: s.y });
-      buildSegs(s);
-      if (s.x < 10 || s.y < 10 || s.x > W - 10 || s.y > W - 10) { sink(s, null, "edge"); continue; }
-      if (hitIsle(s.x, s.y, radius(s) * .15)) { if (s.ward || s.invuln) { s.a += Math.PI; if (s.ward) { s.ward = 0; delete s.buffs.ward; s.invuln = 90; } } else { sink(s, null, "rock"); continue; } }
-      // gold: magnet pulls, then eat
-      const r = radius(s) + 7, pull = s.buffs.magnet ? 190 : 0, mult = s.buffs.mead ? 2 : 1;
-      gridNear(goldGrid, s.x, s.y, Math.max(r, pull), g => {
-        if (g.eaten) return; const dd = d2(g.x, g.y, s.x, s.y);
-        if (pull && dd < pull * pull) { const d = Math.sqrt(dd) || 1; g.x += (s.x - g.x) / d * 3 * f; g.y += (s.y - g.y) / d * 3 * f; }
-        if (dd < r * r) { g.eaten = true; s.score += g.v * mult; if (s.isPlayer) sfx.coin(g.v); while (s.score >= 3) { s.score -= 3; s.len++; }
-          if (TH && s.isPlayer) { s.treats = (s.treats || 0) + 1; if (s.treats === 150) achieve(TH.treatAch); } }
-      });
-      for (let i = powers.length - 1; i >= 0; i--) { const p = powers[i]; if (d2(p.x, p.y, s.x, s.y) < (r + 16) ** 2) { powers.splice(i, 1); grant(s, p.p); } }
-    }
-    let gw = 0; for (let j = 0; j < gold.length; j++) { const g = gold[j]; if (g.eaten) continue; if (g.glow) g.glow = Math.max(0, g.glow - f); gold[gw++] = g; } gold.length = gw;
-    for (const s of ships) if (s.alive && s.len > s.peak) s.peak = s.len;
+    if (running && player && player.alive) readInput();
+    if (net.on) netStep(f);
+    else { world.viewers = player && player.alive ? [player] : [cam]; world.step(f); }
     if (player && player.alive && player.len >= 150) achieve("len150");
-    // prow vs shields
-    for (const s of ships) {
-      if (!s.alive || s.buffs.ghost || s.invuln || s.solidify) continue;
-      const rs = radius(s) * .55; let hitBy = null;
-      gridNear(segGrid, s.x, s.y, 60, v => { if (v.s === s || !v.s.alive || v.i === 0 || v.s.buffs.ghost || v.s.solidify) return;
-        if (d2(s.x, s.y, v.x, v.y) < (radius(v.s) * .78 + rs) ** 2) { hitBy = v.s; return false; } });
-      if (hitBy) sink(s, hitBy, "ship");
-    }
     // danger warning: light up enemy shields and coastline just ahead of YOUR prow
     warnIsle = null;
-    if (player && player.alive) { const pr = radius(player), hx = player.x + Math.cos(player.a) * pr * 1.2, hy = player.y + Math.sin(player.a) * pr * 1.2, rs = pr * .55;
-      gridNear(segGrid, hx, hy, 130, v => { if (v.s === player || v.i === 0 || !v.s.alive || v.s.buffs.ghost) return;
-        const lim = radius(v.s) * .78 + rs + 55; if (d2(hx, hy, v.x, v.y) < lim * lim) { v.warn = tick; sfx.warn(); } });
+    if (player && player.alive) {
+      cGrid.clear(); for (const s of ships) if (s.alive && s !== player && !s.hidden) { const sg = s.segs; for (let j = 1; j < sg.length; j++) cGrid.add(sg[j].x, sg[j].y, sg[j]); }
+      const pr = radius(player), hx = player.x + Math.cos(player.a) * pr * 1.2, hy = player.y + Math.sin(player.a) * pr * 1.2, rs = pr * .55;
+      cGrid.near(hx, hy, 130, v => { if (v.s.buffs.ghost) return;
+        const lim = radius(v.s) * .78 + rs + 55; if (Sim.d2(hx, hy, v.x, v.y) < lim * lim) { v.warn = tick; sfx.warn(); } });
       warnIsle = hitIsle(hx, hy, 45); }
-    if (gold.length < GOLD_TARGET) spawnGold(Math.min(20, GOLD_TARGET - gold.length));
-    for (let i = powers.length - 1; i >= 0; i--) if ((powers[i].life -= f) <= 0) powers.splice(i, 1);
-    if (powers.length < POWER_TARGET && Math.random() < .02 * f) spawnPower();
-    for (const b of bolts) b.t -= f; bolts = bolts.filter(b => b.t > 0);
-    for (const s of ships) if (s.alive) wakeFor(s, f); stepParts(f);
+    for (const s of ships) if (s.alive && !s.hidden) wakeFor(s, f); stepParts(f);
     // camera
-    const follow = player && player.alive ? player : (!player ? ships.find(x => x.alive) : null);
+    const follow = player ? (player.alive ? player : null) : ships.find(x => x.alive && !x.hidden && x.kind === "bot");
     if (follow) { cam.x += (follow.x - cam.x) * .1; cam.y += (follow.y - cam.y) * .1; }
-    const tz = (player ? clamp(1.1 - player.len / 300, .55, 1.05) : .8) * (SHORTS ? .78 : clamp(vw / 1000, .62, 1));
+    const tz = (player && player.alive ? clamp(1.1 - player.len / 300, .55, 1.05) : .8) * (SHORTS ? .78 : clamp(vw / 1000, .62, 1));
     cam.z += (Math.max(COARSE ? .45 : .4, tz) - cam.z) * .03;   // don't zoom out so far on phones that ships become specks
+  }
+
+  /* ===================== multiplayer lobbies =====================
+     The game joins the oldest lobby with a free seat (Lobby 1, then 2, ...). Each lobby is one shared sea run by the server.
+     Your own ship moves instantly on your screen and the server checks every move; everyone else glides along about 0.1s behind.
+     If the server can't be reached, everything quietly falls back to the bots-only sea. Add ?offline=1 to the address to force that. */
+  const ONLINE_OK = !QS.has("offline") && !SHORTS && /^https?:$/.test(location.protocol) && "WebSocket" in window;
+  const NET_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/games/longship/lobby";
+  const net = { on: false, tried: false, ws: null, lobby: 0, max: 20, humans: 0, byId: new Map(), goldById: new Map(), meId: 0, lastSend: 0, lastView: 0, sailing: false };
+  const INTERP = 100;   // ms other ships are shown behind real time, so their movement looks smooth
+  function netConnect(n) {
+    net.tried = true;
+    if (n > 60) return;
+    let ws; try { ws = new WebSocket(NET_URL + "?n=" + n); } catch (e) { return; }
+    let got = false;
+    const give = setTimeout(() => { if (!got) { try { ws.close(); } catch (e) {} } }, 7000);
+    ws.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (m.t === "full") { got = true; clearTimeout(give); ws.onclose = null; ws.close(); netConnect(n + 1); return; }   // this lobby is full: try the next one
+      if (m.t === "init") {
+        got = true; clearTimeout(give);
+        if ((m.season || null) !== (SEASON || null) || running) { ws.onclose = null; ws.close(); return; }   // a different season (testing) or mid-voyage offline: stay offline
+        net.ws = ws; netInit(m); return;
+      }
+      if (net.ws === ws) netMsg(m);
+    };
+    ws.onopen = () => ws.send(JSON.stringify(Object.assign({ t: "hello", v: 1, name: ($("name").value.trim() || "Viking").slice(0, 14) }, lookMsg())));
+    ws.onclose = () => { clearTimeout(give); if (net.ws === ws) netLost(); else if (!got) paintLobby(); };
+    ws.onerror = () => {};
+  }
+  function lookMsg() { const l = myLook(); return { skin: l.skinId, fig: l.fig, trail: l.trailId }; }
+  function netInit(m) {
+    net.on = true; net.lobby = m.lobby; net.max = m.max; net.humans = m.pc; world = null; player = null; net.meId = 0;
+    net.byId.clear(); net.goldById.clear();
+    isles = m.isles.map(([x, y, r, pts, trees]) => ({ x, y, r, pts, trees }));
+    gold = []; for (const g of m.gold) addNetGold(g);
+    setPowers(m.pw); bolts = [];
+    ships = []; for (const d of m.meta) addNetShip(d);
+    for (const [id, x, y, a, len] of m.pos) { const s = net.byId.get(id); if (s) { s.x = x; s.y = y; s.a = a / 100; s.len = len; s.hidden = true; } }
+    paintLobby();
+  }
+  function addNetGold([id, x, y, ti, hi, glow]) { const type = Sim.LOOT_TYPES[ti] || "coin";
+    const g = { id, x, y, type, v: Sim.LOOT[type].v, t: (id % 60) / 10, h: Sim.GEM_HUES[hi] || 350, glow: glow ? 60 * 25 : 0 }; gold.push(g); net.goldById.set(id, g); }
+  function setPowers(list) { powers = list.map(([id, x, y, pi, life]) => ({ id, x, y, p: Sim.POWERS[pi], life, t: (id % 60) / 10 })); }
+  function addNetShip([id, name, kind, skinId, fig, trailId, boss, human]) {
+    if (net.byId.has(id)) return;
+    const s = { id, name, kind, skinId, fig, trailId, boss: !!boss, human: !!human, alive: true, hidden: true, x: 0, y: 0, a: 0, len: 8, kills: 0, peak: 8, buf: [], path: [], segs: [], buffs: {} };
+    dress(s); net.byId.set(id, s); ships.push(s);
+    if (id === net.meId) adoptMe(s);
+  }
+  function delNetShip(id) { const s = net.byId.get(id); if (!s || s === player) return; net.byId.delete(id); const i = ships.indexOf(s); if (i >= 0) ships.splice(i, 1); }
+  function adoptMe(s) { player = s; s.isPlayer = true; s.hidden = false; s.alive = true; s.target = s.a; }
+  function netSail(nm) {
+    net.sailing = true; $("start").classList.add("hidden");
+    net.ws.send(JSON.stringify(Object.assign({ t: "sail", name: nm }, lookMsg())));
+  }
+  const FL = { boost: 1, ghost: 2, solid: 4, ward: 8, magnet: 16, oars: 32 };
+  function netMsg(m) {
+    if (m.t === "pong") return;
+    if (m.t !== "s") return;
+    const now = performance.now();
+    if (m.md) for (const id of m.md) { const s = net.byId.get(id); if (s && s === player) continue; delNetShip(id); }
+    if (m.ma) for (const d of m.ma) addNetShip(d);
+    if (m.gd) for (const id of m.gd) { const g = net.goldById.get(id); if (g) { g.eaten = true; net.goldById.delete(id); } }
+    if (m.ga) for (const g of m.ga) addNetGold(g);
+    if (m.gd || m.ga) { let w = 0; for (let j = 0; j < gold.length; j++) if (!gold[j].eaten) gold[w++] = gold[j]; gold.length = w; }
+    if (m.pw) setPowers(m.pw);
+    if (m.bo) for (const [x1, y1, x2, y2] of m.bo) bolts.push({ x1, y1, x2, y2, t: 30 });
+    if (m.seg) for (const id in m.seg) { const s = net.byId.get(+id); if (!s || s === player) continue;
+      const a = m.seg[id]; s.path = []; for (let k = a.length - 2; k >= 0; k -= 2) s.path.push({ x: a[k], y: a[k + 1] });
+      s.x = a[0]; s.y = a[1]; s.buf = []; }
+    if (m.n) for (const [id, x, y, a, len, fl] of m.n) { const s = net.byId.get(id); if (!s) continue;
+      s.len = len; s.boosting = !!(fl & FL.boost); s.solidify = fl & FL.solid ? 1 : 0; s.ward = fl & FL.ward ? 1 : 0; s.invuln = 0;
+      s.buffs.ghost = fl & FL.ghost ? 1 : undefined; s.buffs.magnet = fl & FL.magnet ? 1 : undefined; if (!(fl & FL.ghost)) delete s.buffs.ghost; if (!(fl & FL.magnet)) delete s.buffs.magnet;
+      if (s === player) continue;
+      s.buf.push({ t: now, x, y, a: a / 100 }); if (s.buf.length > 12) s.buf.shift(); s.seen = now; s.hidden = false; }
+    if (m.f) for (const [id, x, y, len] of m.f) { const s = net.byId.get(id); if (!s || s === player) continue; s.len = len; if (s.hidden) { s.x = x; s.y = y; } }
+    if (m.me && player) { const me = m.me; player.len = me.len; player.peak = me.peak; player.kills = me.kills; player.ward = me.ward; player.invuln = me.inv;
+      player.buffs = {}; for (const k in me.b) player.buffs[k] = { t: me.b[k][0], max: me.b[k][1] }; }
+    if (m.pc !== undefined) { net.humans = m.pc; paintLobby(); }
+    if (m.ev) for (const e of m.ev) netEvent(e);
+  }
+  function netEvent(e) {
+    switch (e.k) {
+      case "you": { if (player && player.id !== e.id) { const i = ships.indexOf(player); if (i >= 0) ships.splice(i, 1); player = null; }   // last voyage's wreck
+        const s = net.byId.get(e.id); net.meId = e.id; if (s) adoptMe(s);
+        if (player) { player.x = e.x; player.y = e.y; player.a = player.target = e.a; player.path = []; for (let i = 60; i >= 1; i--) player.path.push({ x: e.x - Math.cos(e.a) * i * Sim.PSTEP, y: e.y - Math.sin(e.a) * i * Sim.PSTEP });
+          player.name = e.name; player.treats = 0; cam.x = e.x; cam.y = e.y; cam.z = 1; running = true; }
+        break; }
+      case "fix": if (player) { player.x = e.x; player.y = e.y; player.a = player.target = e.a; } break;
+      case "sunk": onPlayerSunk(e); net.sailing = false; break;
+      case "kill": onKill(e); break;
+      case "ward": onWardSave(); break;
+      case "grant": onGrant(Sim.POWERS[e.p], e.hit); break;
+      case "eat": for (const v of e.v) onEat(v); break;
+      case "returned": toast(`${e.name} has returned...`); break;
+      case "kick": toast("⏸️ Seat freed after a long break", "Press Set sail to rejoin"); break;
+    }
+  }
+  function netLost() {
+    const was = net.on; net.on = false; net.ws = null; paintLobby();
+    if (!was) return;
+    if (running && player && player.alive) { toast("📡 Connection lost", "Your voyage ended. Press Sail again to keep playing"); onPlayerSunk({ by: null, how: "lost", peak: player.peak || player.len, kills: player.kills || 0 }); }
+    newOfflineWorld(); player = null;
+    setTimeout(() => { if (!net.on && !running) netConnect(1); }, 4000);   // try to get back into a lobby
+  }
+  // every frame while in a lobby: move your own ship, glide the others, tell the server where you are
+  function netStep(f) {
+    const now = performance.now(), rt = now - INTERP;
+    if (player && player.alive && running) {
+      Sim.moveShip(player, f); Sim.pushPath(player); Sim.buildSegs(player);
+      // hide gold you sail over right away (the server confirms a moment later)
+      const r = radius(player) + 7; for (const g of gold) if (!g.eaten && Math.abs(g.x - player.x) < r && Math.abs(g.y - player.y) < r) g.hidden = now;
+    }
+    for (const s of ships) {
+      if (s === player) continue;
+      if (s.hidden || !s.buf.length) continue;
+      if (now - s.seen > 1500) { s.hidden = true; continue; }   // sailed out of your view
+      const b = s.buf; let i = b.length - 1; while (i > 0 && b[i - 1].t > rt) i--;
+      const p1 = b[i], p0 = b[i - 1] || p1;
+      let x, y, a;
+      if (p0 === p1 || rt >= p1.t) { x = p1.x; y = p1.y; a = p1.a; }
+      else { const k = clamp((rt - p0.t) / (p1.t - p0.t), 0, 1); x = p0.x + (p1.x - p0.x) * k; y = p0.y + (p1.y - p0.y) * k; a = p0.a + Sim.angDiff(p0.a, p1.a) * k; }
+      s.x = x; s.y = y; s.a = a; Sim.pushPath(s); Sim.buildSegs(s);
+    }
+    for (const g of gold) if (g.glow) g.glow = Math.max(0, g.glow - f);
+    for (let i = bolts.length - 1; i >= 0; i--) if ((bolts[i].t -= f) <= 0) bolts.splice(i, 1);
+    // 15 updates a second: where you are (if sailing) and what part of the sea you're looking at
+    if (now - net.lastSend > 66 && net.ws && net.ws.readyState === 1) {
+      net.lastSend = now;
+      const m = { t: "in", cx: Math.round(cam.x), cy: Math.round(cam.y), v: Math.ceil(Math.max(vw, vh) / 2 / cam.z) };
+      if (player && player.alive && running) { m.x = Math.round(player.x * 10) / 10; m.y = Math.round(player.y * 10) / 10; m.a = Math.round(player.a * 1000) / 1000; m.b = player.boosting ? 1 : 0; }
+      net.ws.send(JSON.stringify(m));
+    }
+  }
+  function paintLobby() {
+    const el = $("lobby"); if (!el) return;
+    el.innerHTML = net.on ? `🌐 Lobby ${net.lobby} · <b>${net.humans}</b>/${net.max} Vikings` : ONLINE_OK && net.tried ? "🤖 Bots-only sea" : "";
   }
 
   /* ===================== drawing ===================== */
@@ -851,7 +764,7 @@ body.shorts #sndBar{display:none}
   }
   function drawGold() {
     const hx = vw / 2 / cam.z + 24, hy = vh / 2 / cam.z + 24, cx = cam.x, cy = cam.y, anim = SEASON ? LOOT_ANIM[SEASON] : null;
-    for (let j = 0; j < gold.length; j++) { const g = gold[j]; if (Math.abs(g.x - cx) > hx || Math.abs(g.y - cy) > hy) continue;
+    for (let j = 0; j < gold.length; j++) { const g = gold[j]; if ((g.hidden && performance.now() - g.hidden < 1500) || Math.abs(g.x - cx) > hx || Math.abs(g.y - cy) > hy) continue;
       const bob = Math.sin(tick * .06 + g.t) * 1.3, y = g.y + bob;
       if (g.v >= 2) { const col = g.type === "gem" ? `hsl(${g.h},90%,65%)` : HALO[g.type] || "#ffffff", R = (g.type === "chest" ? 30 : 12 + g.v) * (.9 + .12 * Math.sin(tick * .08 + g.t));
         ctx.drawImage(haloSprite(g.type === "gem" ? ["#ff5c7a", "#5cff9d", "#5cb8ff", "#c77dff"][GEM_HUES.indexOf(g.h)] || "#ffffff" : col), g.x - R, y - R, R * 2, R * 2); }
@@ -1111,7 +1024,7 @@ body.shorts #sndBar{display:none}
     c.restore();
   }
   function drawShip(s) {
-    if (!s.alive) return;
+    if (!s.alive || s.hidden || !s.segs.length) return;
     const r = radius(s), segs = s.segs, ghost = s.buffs.ghost, rogue = s.kind === "rogue", m = r * 2.6 + 30;
     const hx = vw / 2 / cam.z, hy = vh / 2 / cam.z;
     if (s.bx1 + m < cam.x - hx || s.bx0 - m > cam.x + hx || s.by1 + m < cam.y - hy || s.by0 - m > cam.y + hy) return;   // whole ship off-screen
@@ -1126,7 +1039,7 @@ body.shorts #sndBar{display:none}
     // name tag with a dark outline so it reads over anything
     ctx.font = `800 ${Math.max(11, r * .85)}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.65)"; ctx.strokeText(s.name, s.x, s.y - r * 2.3);
-    ctx.fillStyle = s.isPlayer ? "#ffd166" : rogue ? "#ff8a7a" : "#ffffff"; ctx.fillText(s.name, s.x, s.y - r * 2.3);
+    ctx.fillStyle = s.isPlayer ? "#ffd166" : rogue ? "#ff8a7a" : s.human ? "#8fd3ff" : "#ffffff"; ctx.fillText(s.name, s.x, s.y - r * 2.3);
   }
   // premium figureheads: bigger, animated, and they give off particles (fx = [wake kind, how it moves])
   //   breath = blown forward from the mouth · aura = sparkles around the head · up = rising off it
@@ -1232,11 +1145,11 @@ body.shorts #sndBar{display:none}
   function drawHud() {
     if ((hudT += 1) % 6) return;
     const esc = t => t.replace(/[<&]/g, "");
-    if (player) $("hud").innerHTML = `Shield wall <b>${player.len}</b><br>Sunk ${player.kills}` +
+    if (player) $("hud").innerHTML = `Shield wall <b>${player.len}</b><br>Sunk ${player.kills}` + (net.on ? `<div class="lob">🌐 Lobby ${net.lobby} · ${net.humans}/${net.max} Vikings</div>` : "") +
       `<div class="buffs">${Object.entries(player.buffs).map(([k, v]) => { const p = POWERS.find(q => q.id === k); return `<div class="buff"><i>${p.icon}</i>${p.name}<span class="bar"><span style="width:${100 * v.t / v.max}%"></span></span></div>`; }).join("")}</div>`;
     const top = ships.filter(s => s.alive).sort((a, b) => b.len - a.len).slice(0, 6);
     if (player && player.alive && top[0] === player && player.len > 30) achieve("top1");
-    $("board").innerHTML = `<h4>Mightiest raiders</h4>` + top.map((s, i) => `<div class="${s.isPlayer ? "me" : s.kind === "rogue" ? "rogue" : ""}">${i + 1}. ${esc(s.name)} · ${s.len}</div>`).join("") +
+    $("board").innerHTML = `<h4>Mightiest raiders</h4>` + top.map((s, i) => `<div class="${s.isPlayer ? "me" : s.kind === "rogue" ? "rogue" : s.human ? "human" : ""}">${i + 1}. ${s.human && !s.isPlayer ? "👤 " : ""}${esc(s.name)} · ${s.len}</div>`).join("") +
       (player && player.alive && !top.includes(player) ? `<div class="me">… ${esc(player.name)} · ${player.len}</div>` : "");
     mctx.clearRect(0, 0, 240, 240); mctx.save(); mctx.beginPath(); mctx.arc(120, 120, 118, 0, 7); mctx.clip();
     const k = 240 / W;
@@ -1464,7 +1377,8 @@ body.shorts #sndBar{display:none}
   }
 
   // ships sail behind the title screen
-  setupWorld(); player = null;
+  newOfflineWorld(); player = null;
+  if (ONLINE_OK) netConnect(1);   // join a real lobby (falls back to bots-only if the server can't be reached)
   $("name").value = store.get("ls_name") || "";
   if (TH) $("seasonTag").innerHTML = `${TH.tag}<small>${TH.sub}</small>`;
   const best = +store.get("ls_best") || 0; if (best) $("bestLine").innerHTML = `Your best shield wall: <span class="best">${best}</span>`;
