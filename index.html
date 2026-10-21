@@ -62,6 +62,8 @@ body.shorts #recHint{display:block}
 .lb .rk{width:26px;text-align:center;opacity:.9}.lb .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lb .sc{color:var(--gold);font-weight:800}.lb .sc i{font-style:normal;opacity:.7;font-size:11px;margin-left:4px;color:var(--ink)}
 .lb li.mine{background:#e7b54a26;border-radius:8px}.lb li.mine .nm::after{content:" (you)";opacity:.7;font-size:11px}
 .lb .lbnote{display:block;opacity:.8;font-size:13px;line-height:1.4;text-align:center;padding:10px 4px}
+#wardGrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+#acct{margin-top:10px}#acct small{margin-top:4px}#acct a{color:var(--gold)}
 .skin .wk{display:block;font:600 11px system-ui;font-style:normal;color:var(--gold);opacity:.85}
 #boostBtn{position:fixed;left:16px;bottom:18px;width:76px;height:76px;border-radius:50%;border:2px solid #ffffff44;background:#0007;color:var(--gold);font:800 13px system-ui;display:none}
 @media (pointer:coarse){#boostBtn{display:block}}
@@ -70,8 +72,9 @@ body.shorts #recHint{display:block}
 #ward{position:fixed;inset:0;z-index:30;background:#06192af2;display:flex;flex-direction:column;align-items:center;overflow:auto;padding:18px 12px 30px}
 #ward .top{display:flex;align-items:center;gap:12px;width:100%;max-width:760px;flex-wrap:wrap}
 #ward h2{margin:0;font:900 26px system-ui;flex:1}
-#ward .tabs{display:flex;gap:6px;width:100%;max-width:760px;margin:12px 0}
-#ward .tabs button{flex:1;padding:10px;border-radius:10px;border:2px solid #ffffff22;background:#0005;color:var(--ink);font:700 14px system-ui;cursor:pointer}
+#ward .tabs{display:flex;flex-shrink:0;gap:6px;width:100%;max-width:760px;margin:12px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+#ward .tabs::-webkit-scrollbar{display:none}
+#ward .tabs button{flex:1 0 auto;min-width:118px;scroll-snap-align:start;white-space:nowrap;padding:10px;border-radius:10px;border:2px solid #ffffff22;background:#0005;color:var(--ink);font:700 14px system-ui;cursor:pointer}
 #ward .tabs button.on{border-color:var(--gold);color:var(--gold)}
 #ward .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%;max-width:760px}
 .skin{background:#0b2a3c;border:2px solid #ffffff1a;border-radius:12px;padding:8px;text-align:center;cursor:pointer;position:relative}
@@ -95,7 +98,7 @@ body.shorts #recHint{display:block}
 <div id="toast"></div>
 <button id="recBtn" title="Record a vertical clip for TikTok / Shorts">● REC</button><div id="recHint">Shorts mode · 9:16 · press REC, play, press again to save (auto-stops at 59s)</div>
 <div id="ward" class="hidden"><div class="top"><h2>🎨 Wardrobe</h2><span>Plunder: <span class="plunder" data-plunder></span></span><button class="btn2" id="wardClose" style="margin:0">Done</button></div>
-  <div class="tabs"><button data-tab="ships" class="on">Ship skins</button><button data-tab="figs">Figureheads</button></div>
+  <div class="tabs"><button data-tab="ships" class="on">⛵ Ship skins</button><button data-tab="figs">🐉 Figureheads</button><button data-tab="trails">✨ Trails</button></div>
   <div class="grid" id="wardGrid"></div>
   <p style="max-width:760px;opacity:.75;font-size:13px;text-align:center;margin-top:14px">Earn plunder every voyage: your shield wall plus 25 for each raider you sink. Spend it here, or unlock the special skins by pulling off their feats.</p></div>
 <button id="boostBtn" aria-label="Row hard (boost)">ROW!</button>
@@ -114,6 +117,7 @@ body.shorts #recHint{display:block}
   </div>
   <small>Steer with the mouse, a finger drag, or WASD / arrow keys<br>Row hard: hold click, Space, or ROW! (costs shields)</small>
   <small id="bestLine"></small>
+  <div id="acct"></div>
   <button class="btn2" id="lbBtn">🏆 High scores</button>
   <div id="startLb" class="hidden"><div class="lb"><div class="lbtabs"><button data-lbtab="today" class="on">Today</button><button data-lbtab="all">All-time</button></div><ol data-lblist></ol></div></div>
 </div></div>
@@ -201,7 +205,7 @@ body.shorts #recHint{display:block}
   ];
   const BOSS_SKINS = { krampus: { id: "krampus", a: "#5b0f0f", b: "#111111", shape: "kite", pat: "cross", hull: ["#080202", "#2a0808", "#a93226"], sail: ["#111111", "#a93226"], sailPat: "torn", emb: "horns", embC: "#e74c3c", wake: "crimson", glow: "#c0392b" } };
   const WAKE_NAME = { foam: "Sea foam", leaves: "Falling leaves", feather: "Raven feathers", frost: "Frost sparkle", gold: "Gold glitter", aurora: "Northern lights", spark: "Lightning sparks",
-    ink: "Kraken ink", crimson: "Red sparks", embers: "Embers", light: "Holy light", mist: "Ghost mist", ash: "Ash", pleaves: "Autumn leaves", candy: "Candy sparkle", snow: "Snowfall", sprinkle: "Sprinkles" };
+    ink: "Kraken ink", crimson: "Red sparks", embers: "Embers", light: "Holy light", mist: "Ghost mist", ash: "Ash", pleaves: "Autumn leaves", candy: "Candy sparkle", snow: "Snowfall", sprinkle: "Sprinkles", venom: "Venom sparks", bifrost: "Rainbow sparks", valk: "White feathers" };
   const SEASON_LABEL = { halloween: "🎃 Halloween only", christmas: "🎄 Christmas only" };
   const FIGS = [
     { id: "dragon",  name: "Dragon",  un: { t: "free" } },
@@ -210,11 +214,48 @@ body.shorts #recHint{display:block}
     { id: "ravenh",  name: "Raven",   un: { t: "buy", cost: 600 } },
     { id: "bear",    name: "Bear",    un: { t: "ach", key: "sinks25", label: "Sink 25 raiders in total" } },
     { id: "skull",   name: "Skull",   un: { t: "ach", key: "rogue", label: "Sink a ☠ rogue" } },
+    // ✨ premium figureheads — animated, with their own particles
+    { id: "gdragon",  name: "Golden Dragon",   un: { t: "buy", cost: 1200 } },
+    { id: "ramh",     name: "Tanngrisnir",     un: { t: "buy", cost: 1800 } },
+    { id: "firedrake",name: "Fire Drake",      un: { t: "buy", cost: 2500 } },
+    { id: "frostwyrm",name: "Frost Wyrm",      un: { t: "buy", cost: 3000 } },
+    { id: "krakenh",  name: "Kraken",          un: { t: "buy", cost: 3500 } },
+    { id: "ravens",   name: "Huginn & Muninn", un: { t: "buy", cost: 4000 } },
+    { id: "phoenix",  name: "Phoenix",         un: { t: "buy", cost: 5000 } },
+    { id: "fenrir",   name: "Fenrir",          un: { t: "buy", cost: 6500 } },
+    { id: "sleipnir", name: "Sleipnir",        un: { t: "buy", cost: 8000 } },
+    { id: "jorm",     name: "Jörmungandr",     un: { t: "buy", cost: 9500 } },
+    { id: "valkyrie", name: "Valkyrie",        un: { t: "buy", cost: 12000 } },
+    { id: "sol",      name: "Sól, the Sun",    un: { t: "buy", cost: 15000 } },
     { id: "jack",    name: "Jack-o'-Lantern", season: "halloween", un: { t: "ach", key: "h_runs3", label: "Sail 3 voyages in October" } },
     { id: "bat",     name: "Bat",     season: "halloween", un: { t: "buy", cost: 250 } },
+    { id: "wraith",  name: "Lantern Wraith", season: "halloween", un: { t: "buy", cost: 900 } },
     { id: "reindeer",name: "Reindeer", season: "christmas", un: { t: "ach", key: "x_runs3", label: "Sail 3 voyages in December" } },
     { id: "snowman", name: "Snowman", season: "christmas", un: { t: "buy", cost: 250 } },
+    { id: "yulestar",name: "Yule Star", season: "christmas", un: { t: "buy", cost: 900 } },
   ];
+  // trails: what streams behind your ship + a glow under your shields. Chosen separately from the skin.
+  const TRAILS = [
+    { id: "skin",     name: "Skin's own trail", wake: null,       aura: null,      un: { t: "free" } },
+    { id: "foam",     name: "Sea Foam",         wake: "foam",     aura: null,      un: { t: "free" } },
+    { id: "glitter",  name: "Gold Glitter",     wake: "gold",     aura: "#ffd54f", un: { t: "buy", cost: 600 } },
+    { id: "frostt",   name: "Frost Sparkle",    wake: "frost",    aura: "#9fe3ff", un: { t: "buy", cost: 800 } },
+    { id: "embert",   name: "Ember Wake",       wake: "embers",   aura: "#ff8c1a", un: { t: "buy", cost: 1000 } },
+    { id: "feathert", name: "Raven Feathers",   wake: "feather",  aura: "#8e7cff", un: { t: "buy", cost: 1200 } },
+    { id: "inkt",     name: "Kraken Ink",       wake: "ink",      aura: "#2bbf9f", un: { t: "buy", cost: 1500 } },
+    { id: "sparkt",   name: "Lightning",        wake: "spark",    aura: "#c9a7ff", flicker: 1, un: { t: "buy", cost: 2000 } },
+    { id: "auroratr", name: "Northern Lights",  wake: "aurora",   aura: "rainbow", un: { t: "buy", cost: 2500 } },
+    { id: "lightt",   name: "Holy Light",       wake: "light",    aura: "#fff3b0", un: { t: "buy", cost: 3500 } },
+    { id: "venomt",   name: "Serpent Venom",    wake: "venom",    aura: "#7dff5c", un: { t: "buy", cost: 4500 } },
+    { id: "bifrost",  name: "Bifröst",          wake: "bifrost",  aura: "rainbow", un: { t: "buy", cost: 7500 } },
+    { id: "valkt",    name: "Valkyrie Wings",   wake: "valk",     aura: "#fff7d6", un: { t: "buy", cost: 10000 } },
+    { id: "mistt",    name: "Ghost Mist",       wake: "mist",     aura: "#9cffc8", season: "halloween", un: { t: "buy", cost: 400 } },
+    { id: "pleavest", name: "Autumn Leaves",    wake: "pleaves",  aura: null,      season: "halloween", un: { t: "buy", cost: 300 } },
+    { id: "snowt",    name: "Snowfall",         wake: "snow",     aura: "#e6f9ff", season: "christmas", un: { t: "buy", cost: 300 } },
+    { id: "candyt",   name: "Candy Sparkle",    wake: "candy",    aura: "#ff5c8a", season: "christmas", un: { t: "buy", cost: 400 } },
+  ];
+  const RAINBOW = ["#ff5c5c", "#ffb35c", "#ffe95c", "#7dff5c", "#5cffd6", "#5cb8ff", "#9b7dff", "#ff7de9"];
+
   const inSeason = it => !it.season || it.season === SEASON;
   const ROGUE_SKIN = { id: "rogue", a: "#1b1b1b", b: "#c0392b", shape: "kite", pat: "cross", hull: ["#050505", "#1f1f1f", "#c0392b"], sail: ["#1b1b1b", "#c0392b"], sailPat: "torn", emb: "skull", embC: "#e8e8e8", wake: "crimson" };
   const NAMES = ["Ragnhild", "Bjorn", "Sigrid", "Ulf", "Astrid", "Leif", "Freydis", "Hakon", "Gunnar", "Thyra", "Eirik", "Solveig", "Knut", "Ingrid",
@@ -238,13 +279,13 @@ body.shorts #recHint{display:block}
   const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   // saved progress on this device: plunder, unlocks, equipped look, lifetime stats
   const prof = (() => { let p = null; try { p = JSON.parse(store.get("ls_profile") || "null"); } catch (e) {}
-    p = p || {}; p.plunder = p.plunder || 0; p.owned = p.owned || []; p.ach = p.ach || {}; p.eq = p.eq || { skin: "fjord", fig: "dragon" };
+    p = p || {}; p.plunder = p.plunder || 0; p.owned = p.owned || []; p.ach = p.ach || {}; p.eq = p.eq || { skin: "fjord", fig: "dragon" }; p.eq.trail = p.eq.trail || "skin";
     p.stats = p.stats || { runs: 0, sinks: 0 }; return p; })();
-  const saveProf = () => store.set("ls_profile", JSON.stringify(prof));
+  const saveProf = () => { prof.t = Date.now(); store.set("ls_profile", JSON.stringify(prof)); cloudSave(); };
   const unlocked = it => it.un.t === "free" || prof.owned.includes(it.id) || (it.un.t === "ach" && prof.ach[it.un.key]);
   function achieve(key) {
     if (prof.ach[key]) return; prof.ach[key] = true; saveProf();
-    const it = [...SKINS, ...FIGS].find(x => x.un.t === "ach" && x.un.key === key);
+    const it = [...SKINS, ...FIGS, ...TRAILS].find(x => x.un.t === "ach" && x.un.key === key);
     if (it) setTimeout(() => toast(`🏆 Unlocked: ${it.name}!`, "Equip it in the Wardrobe"), 1200);
   }
   const rnd = (a, b) => a + Math.random() * (b - a), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -332,9 +373,10 @@ body.shorts #recHint{display:block}
     const [x, y] = freeSpot(260, 700), a = rnd(0, Math.PI * 2);
     const pool = SKINS.filter(inSeason), seasonalRogue = TH && (SKINS.find(k => k.id === TH.rogueSkin) || BOSS_SKINS[TH.rogueSkin]);
     const skin = kind === "rogue" ? (seasonalRogue || ROGUE_SKIN) : kind === "player" ? (SKINS.find(k => k.id === prof.eq.skin && unlocked(k)) || SKINS[0]) : pool[(Math.random() * pool.length) | 0];
-    const figPool = FIGS.filter(f => inSeason(f) && f.id !== "skull");
+    const figPool = FIGS.filter(f => inSeason(f) && f.id !== "skull" && (!FIG_FX[f.id] || Math.random() < .35));
     const fig = kind === "rogue" ? "skull" : kind === "player" ? (FIGS.find(f => f.id === prof.eq.fig && unlocked(f)) || FIGS[0]).id : figPool[(Math.random() * figPool.length) | 0].id;
-    const s = { name, kind, isPlayer: kind === "player", x, y, a, target: a, len: BASE_LEN, path: [], skin, fig, alive: true, score: 0, kills: 0, peak: BASE_LEN,
+    const trail = kind === "player" ? TRAILS.find(t => t.id === prof.eq.trail && unlocked(t)) : kind === "bot" && Math.random() < .3 ? TRAILS.filter(t => inSeason(t) && t.wake)[(Math.random() * 14) | 0] : null;
+    const s = { trail: trail && trail.wake ? trail : null, name, kind, isPlayer: kind === "player", x, y, a, target: a, len: BASE_LEN, path: [], skin, fig, alive: true, score: 0, kills: 0, peak: BASE_LEN,
                 think: 0, boosting: false, fleeT: 0, buffs: {}, ward: 0, segs: [] };
     for (let i = 160; i >= 1; i--) s.path.push({ x: x - Math.cos(a) * i * PSTEP, y: y - Math.sin(a) * i * PSTEP });
     return s;
@@ -765,6 +807,9 @@ body.shorts #recHint{display:block}
     ash:     { c: ["#9e9e9e", "#cfc6b0", "#5d5d5d"], s: [1.6, 3], life: 55, grow: .02, a: .7 },
     candy:   { c: ["#ff4b4b", "#ffffff", "#7dff9a"], s: [1.6, 3], life: 50, grow: 0, a: 1, spark: 1 },
     snow:    { c: ["#ffffff", "#e6f9ff"], s: [1.6, 3.2], life: 70, grow: 0, a: .95 },
+    venom:   { c: ["#7dff5c", "#2ecc40", "#c8ff9c"], s: [1.6, 3], life: 45, grow: 0, a: 1, spark: 1 },
+    bifrost: { c: null, s: [1.8, 3.4], life: 60, grow: 0, a: 1, spark: 1 },
+    valk:    { c: ["#ffffff", "#fff7d6", "#ffe08a"], s: [2.4, 3.6], life: 75, grow: 0, a: .95, leaf: 1 },
     sprinkle:{ c: ["#ff5c8a", "#5cc8ff", "#ffe066", "#7dff9a", "#ffffff"], s: [2, 3], life: 55, grow: 0, a: 1, line: 1 },
   };
   const PMAX = COARSE ? 260 : 420, parts = [];
@@ -773,16 +818,24 @@ body.shorts #recHint{display:block}
   function emit(x, y, kind, vx, vy) {
     const w = WAKES[kind] || WAKES.foam, p = parts[pNext]; pNext = (pNext + 1) % PMAX;
     p.on = true; p.x = x; p.y = y; p.vx = vx + rnd(-.35, .35); p.vy = vy + rnd(-.35, .35); p.w = w;
-    p.c = w.c ? w.c[(Math.random() * w.c.length) | 0] : `hsl(${(tick * 3 + rnd(0, 80)) % 360},80%,65%)`;
+    p.c = w.c ? w.c[(Math.random() * w.c.length) | 0] : kind === "bifrost" ? RAINBOW[(Math.random() * 8) | 0] : `hsl(${(tick * 3 + rnd(0, 80)) % 360},80%,65%)`;
     p.s = rnd(w.s[0], w.s[1]); p.max = p.life = w.life * rnd(.7, 1.1); p.rot = rnd(0, 6.3); p.vr = rnd(-.1, .1);
   }
   function wakeFor(s, f) {
     const segs = s.segs; if (segs.length < 2 || !onScreen(s.x, s.y, 400)) return;
-    const kind = s.skin.wake || "foam", rate = s.isPlayer ? (s.boosting ? .9 : .5) : .18;
+    const kind = (s.trail && s.trail.wake) || s.skin.wake || "foam", rate = s.isPlayer ? (s.boosting ? 1.1 : (s.trail ? .8 : .5)) : (s.trail ? .3 : .18);
+    const fx = FIG_FX[s.fig];
+    if (fx) { s.fk = (s.fk || 0) + (s.isPlayer ? .45 : .15) * f;
+      while (s.fk >= 1) { s.fk--; const r = radius(s), ca = Math.cos(s.a), sa = Math.sin(s.a), hx = s.x + ca * r * 2.1, hy = s.y + sa * r * 2.1;
+        if (fx[1] === "breath") emit(hx + ca * r * .9, hy + sa * r * .9, fx[0], ca * 1.8, sa * 1.8);
+        else if (fx[1] === "up") emit(hx + rnd(-r * .4, r * .4), hy + rnd(-r * .4, r * .4), fx[0], -ca * .4, -sa * .4 - .3);
+        else { const a = rnd(0, 6.3); emit(hx + Math.cos(a) * r * .8, hy + Math.sin(a) * r * .8, fx[0], Math.cos(a) * .3, Math.sin(a) * .3); } } }
     s.wk = (s.wk || 0) + rate * f;
     while (s.wk >= 1) { s.wk--;
       const t = segs[segs.length - 1], r = radius(s);
       emit(t.x + rnd(-r * .5, r * .5), t.y + rnd(-r * .5, r * .5), kind, -Math.cos(s.a) * .2, -Math.sin(s.a) * .2);
+      if (s.trail && segs.length > 3) { const q = segs[1 + ((Math.random() * (segs.length - 1)) | 0)];   // trails also stream off the shield wall
+        if (onScreen(q.x, q.y, 20)) emit(q.x + rnd(-r * .6, r * .6), q.y + rnd(-r * .6, r * .6), kind, 0, 0); }
       if (s.isPlayer && Math.random() < .5) { const side = Math.random() < .5 ? 1 : -1, pa = s.a + side * 1.9;   // bow spray
         emit(s.x + Math.cos(s.a) * r * 1.2, s.y + Math.sin(s.a) * r * 1.2, "foam", Math.cos(pa) * .9, Math.sin(pa) * .9); } }
   }
@@ -940,6 +993,13 @@ body.shorts #recHint{display:block}
     for (let i = 2; i < segs.length - 1; i += 2) { const p = segs[i]; if (!vis(p.x, p.y, r * 2)) continue; const q = segs[i - 1], aa = Math.atan2(q.y - p.y, q.x - p.x), sw = Math.sin(tick * (boosting ? .3 : .15) + i) * .5;
       for (let side = -1; side <= 1; side += 2) { const oa = aa + side * (Math.PI / 2 + sw * side); c.moveTo(p.x + Math.cos(oa) * r * .7, p.y + Math.sin(oa) * r * .7); c.lineTo(p.x + Math.cos(oa) * r * 1.75, p.y + Math.sin(oa) * r * 1.75); } }
     c.stroke();
+    // trail glow under the shields
+    const au = opt.trail && opt.trail.aura;
+    if (au) { const ga = c.globalAlpha, R = r * 1.75;
+      for (let i = segs.length - 1; i >= 1; i -= 1) { const p = segs[i]; if (!vis(p.x, p.y, R)) continue;
+        c.globalAlpha = ga * (opt.trail.flicker ? (Math.sin(tick * .9 + i * 2.1) > .2 ? 1 : .4) : .75 + .25 * Math.sin(tick * .08 - i * .35));
+        c.drawImage(haloSprite(au === "rainbow" ? RAINBOW[((i + (tick * .15 | 0)) % RAINBOW.length)] : au), p.x - R, p.y - R, R * 2, R * 2); }
+      c.globalAlpha = ga; }
     // shields
     const rad = r * .74, warned = opt.warned;
     for (let i = segs.length - 1; i >= 1; i--) { const p = segs[i]; if (!vis(p.x, p.y, rad * 1.6)) continue; const q = segs[i - 1];
@@ -960,7 +1020,7 @@ body.shorts #recHint{display:block}
     if (s.bx1 + m < cam.x - hx || s.bx0 - m > cam.x + hx || s.by1 + m < cam.y - hy || s.by0 - m > cam.y + hy) return;   // whole ship off-screen
     ctx.globalAlpha = ghost ? .45 : s.solidify ? ((tick | 0) % 10 < 5 ? .9 : .5) : 1;
     const warned = s.isPlayer ? null : [];
-    drawShipBody(ctx, s.skin, s.fig, segs, r, s.a, { vis: onScreen, boosting: s.boosting, rogue, warned });
+    drawShipBody(ctx, s.skin, s.fig, segs, r, s.a, { vis: onScreen, boosting: s.boosting, rogue, warned, trail: s.trail });
     if (warned && warned.length) { const rad = r * .74; ctx.strokeStyle = `rgba(255,60,40,${.7 + .3 * Math.sin(tick * .5)})`; ctx.lineWidth = 3.5; ctx.beginPath();
       for (const p of warned) { ctx.moveTo(p.x + rad * 1.3, p.y); ctx.arc(p.x, p.y, rad * 1.3, 0, 7); } ctx.stroke(); }
     if (s.ward || s.invuln) { ctx.strokeStyle = "rgba(120,190,255,.7)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x, s.y, r * 2.3, 0, 7); ctx.stroke(); }
@@ -971,8 +1031,81 @@ body.shorts #recHint{display:block}
     ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.65)"; ctx.strokeText(s.name, s.x, s.y - r * 2.3);
     ctx.fillStyle = s.isPlayer ? "#ffd166" : rogue ? "#ff8a7a" : "#ffffff"; ctx.fillText(s.name, s.x, s.y - r * 2.3);
   }
+  // premium figureheads: bigger, animated, and they give off particles (fx = [wake kind, how it moves])
+  //   breath = blown forward from the mouth · aura = sparkles around the head · up = rising off it
+  const FIG_FX = {
+    gdragon: ["gold", "aura"], ramh: ["spark", "aura"], firedrake: ["embers", "breath"], frostwyrm: ["frost", "breath"], krakenh: ["ink", "aura"],
+    ravens: ["feather", "aura"], phoenix: ["embers", "up"], fenrir: ["mist", "breath"], sleipnir: ["light", "up"], jorm: ["venom", "breath"],
+    valkyrie: ["light", "aura"], sol: ["gold", "up"], wraith: ["mist", "up"], yulestar: ["snow", "aura"],
+  };
+  function drawPremiumFig(c, fig, r) {   // origin is just behind the bow tip, +x forward
+    const T = tick, L = (x, y) => c.lineTo(x * r, y * r), M = (x, y) => c.moveTo(x * r, y * r), O = (x, y, rr) => { c.moveTo(x * r + rr * r, y * r); c.arc(x * r, y * r, rr * r, 0, 7); };
+    const glowEye = (x, y, col, rr = .1) => { c.fillStyle = col + "55"; c.beginPath(); O(x, y, rr * 2.2); c.fill(); c.fillStyle = col; c.beginPath(); O(x, y, rr); O(x, -y, rr); c.fill(); };
+    c.lineCap = "round"; c.lineJoin = "round";
+    switch (fig) {
+      case "gdragon": c.fillStyle = "#b8860b"; c.beginPath(); M(-.5, -.35); L(-1, -.85); L(-.25, -.45); M(-.5, .35); L(-1, .85); L(-.25, .45); c.fill();   // horns
+        c.fillStyle = "#f2c94c"; c.beginPath(); c.ellipse(0, 0, r * .62, r * .46, 0, 0, 7); c.fill(); c.beginPath(); M(.3, -.3); L(.95, -.12); L(1.02, 0); L(.95, .12); L(.3, .3); c.fill();
+        c.strokeStyle = "#8a6408"; c.lineWidth = r * .07; c.beginPath(); M(-.3, 0); L(.6, 0); c.stroke(); glowEye(.15, .22, "#ff4d1a", .09); break;
+      case "ramh": c.fillStyle = "#cfd3d6"; c.beginPath(); c.ellipse(r * .05, 0, r * .55, r * .34, 0, 0, 7); c.fill(); c.beginPath(); M(.4, -.18); L(.8, 0); L(.4, .18); c.fill();
+        c.strokeStyle = "#8b6b3e"; c.lineWidth = r * .16; for (const s of [-1, 1]) { c.beginPath(); c.arc(-r * .2, s * r * .45, r * .3, s > 0 ? -1.5 : 1.5, s > 0 ? 3.5 : -3.5, s < 0); c.stroke(); }
+        glowEye(.2, .16, "#ffd23f", .08); break;
+      case "firedrake": { const jaw = .12 + Math.abs(Math.sin(T * .12)) * .2;
+        c.fillStyle = "#5a0f0f"; c.beginPath(); for (let k = 0; k < 4; k++) { M(-.55 + k * .22, -.38); L(-.45 + k * .22, -.7); L(-.35 + k * .22, -.38); M(-.55 + k * .22, .38); L(-.45 + k * .22, .7); L(-.35 + k * .22, .38); } c.fill();   // spikes
+        c.fillStyle = "#c0392b"; c.beginPath(); c.ellipse(0, 0, r * .6, r * .42, 0, 0, 7); c.fill();
+        c.beginPath(); M(.25, -.3); L(1.0, -.08 - jaw); L(.35, -.02); c.fill(); c.beginPath(); M(.25, .3); L(1.0, .08 + jaw); L(.35, .02); c.fill();   // open jaws
+        c.fillStyle = "#ffb21f"; c.beginPath(); M(.4, 0); L(1.0, -jaw * .7); L(1.0, jaw * .7); c.fill(); glowEye(.05, .2, "#ffe066", .09); break; }
+      case "frostwyrm": c.fillStyle = "#dff6ff"; c.beginPath(); for (let k = 0; k < 5; k++) { const x = -.6 + k * .2; M(x, -.3); L(x + .05, -.62 - (k % 2) * .15); L(x + .12, -.3); M(x, .3); L(x + .05, .62 + (k % 2) * .15); L(x + .12, .3); } c.fill();
+        c.fillStyle = "#8fd3f4"; c.beginPath(); c.ellipse(0, 0, r * .58, r * .38, 0, 0, 7); c.fill(); c.beginPath(); M(.3, -.25); L(1.0, -.06); L(1.0, .06); L(.3, .25); c.fill();
+        c.strokeStyle = "#ffffff"; c.lineWidth = r * .06; c.beginPath(); M(-.4, -.1); L(.8, -.03); c.stroke(); glowEye(.1, .17, "#2fa8ff", .08); break;
+      case "krakenh": c.strokeStyle = "#6c2b8a"; c.lineWidth = r * .16;
+        for (let k = 0; k < 6; k++) { const a = -1.3 + k * .52, w = Math.sin(T * .1 + k) * .5; c.beginPath(); M(Math.cos(a) * .3, Math.sin(a) * .3);
+          c.quadraticCurveTo(Math.cos(a + w) * r * .9, Math.sin(a + w) * r * .9, Math.cos(a - w * .5) * r * 1.25, Math.sin(a - w * .5) * r * 1.25); c.stroke(); }
+        c.fillStyle = "#8e44ad"; c.beginPath(); c.ellipse(-r * .05, 0, r * .55, r * .48, 0, 0, 7); c.fill(); glowEye(.12, .2, "#5ff0cf", .1); break;
+      case "ravens": c.fillStyle = "#3a2a1a"; c.beginPath(); O(0, 0, .25); c.fill();
+        for (let k = 0; k < 2; k++) { const a = T * .05 + k * Math.PI, x = Math.cos(a) * r * .75, y = Math.sin(a) * r * .75, fl = Math.sin(T * .4 + k) * r * .25;
+          c.save(); c.translate(x, y); c.rotate(a + Math.PI / 2); c.fillStyle = "#121216";
+          c.beginPath(); c.moveTo(0, -r * .18); c.quadraticCurveTo(-r * .3, -r * .05 - fl, -r * .55, -r * .1); c.quadraticCurveTo(-r * .2, r * .05, 0, r * .2); c.quadraticCurveTo(r * .2, r * .05, r * .55, -r * .1); c.quadraticCurveTo(r * .3, -r * .05 - fl, 0, -r * .18); c.fill();
+          c.fillStyle = "#e7b54a"; c.beginPath(); c.moveTo(-r * .04, -r * .18); c.lineTo(0, -r * .3); c.lineTo(r * .04, -r * .18); c.fill(); c.restore(); } break;
+      case "phoenix": { const fl = Math.sin(T * .25) * .35;
+        for (const s of [-1, 1]) { c.fillStyle = "#ff7b00"; c.beginPath(); M(-.1, s * .15); c.quadraticCurveTo(-r * .6, s * r * (1.1 + fl), -r * 1.0, s * r * (.9 + fl)); c.quadraticCurveTo(-r * .55, s * r * .45, -r * .3, s * r * .2); c.fill();
+          c.fillStyle = "#ffd000"; c.beginPath(); M(-.15, s * .12); c.quadraticCurveTo(-r * .5, s * r * (.75 + fl * .7), -r * .75, s * r * (.62 + fl * .7)); c.quadraticCurveTo(-r * .4, s * r * .3, -r * .25, s * r * .15); c.fill(); }
+        c.fillStyle = "#ff5e00"; c.beginPath(); c.ellipse(r * .05, 0, r * .42, r * .3, 0, 0, 7); c.fill(); c.fillStyle = "#ffd000"; c.beginPath(); M(.38, -.1); L(.75, 0); L(.38, .1); c.fill();
+        c.fillStyle = "#ffe08a"; c.beginPath(); M(-.1, 0); L(-.45, -.15); L(-.3, 0); L(-.45, .15); c.fill(); glowEye(.15, .13, "#fff3b0", .06); break; }
+      case "fenrir": { const jaw = .06 + Math.abs(Math.sin(T * .08)) * .1;
+        c.fillStyle = "#2c3038"; c.beginPath(); M(-.45, -.3); L(-.85, -.8); L(-.15, -.42); M(-.45, .3); L(-.85, .8); L(-.15, .42); c.fill();
+        c.beginPath(); c.ellipse(-r * .05, 0, r * .6, r * .47, 0, 0, 7); c.fill(); c.fillStyle = "#3d434d"; c.beginPath(); M(.25, -.28); L(1.05, -.08 - jaw); L(1.05, .08 + jaw); L(.25, .28); c.fill();
+        c.fillStyle = "#e8e8e8"; c.beginPath(); for (let k = 0; k < 3; k++) { M(.55 + k * .15, -.05 - jaw); L(.6 + k * .15, -jaw * .3); L(.65 + k * .15, -.05 - jaw); } c.fill();
+        glowEye(.12, .2, "#5ff2ff", .1); break; }
+      case "sleipnir": c.fillStyle = "#f4f1ea"; c.beginPath(); c.ellipse(-r * .05, 0, r * .45, r * .33, 0, 0, 7); c.fill(); c.beginPath(); M(.2, -.22); L(.95, -.14); L(1.0, 0); L(.95, .14); L(.2, .22); c.fill();
+        c.strokeStyle = "#cfd8dc"; c.lineWidth = r * .1; for (let k = 0; k < 4; k++) { c.beginPath(); M(-.3 + k * .12, 0); c.quadraticCurveTo(-r * (.7 + k * .05), Math.sin(T * .15 + k) * r * .5, -r * (1.1 + k * .05), Math.sin(T * .15 + k + 1) * r * .6); c.stroke(); }
+        c.fillStyle = "#b0bec5"; c.beginPath(); M(-.2, -.3); L(-.35, -.55); L(-.05, -.32); M(-.2, .3); L(-.35, .55); L(-.05, .32); c.fill(); glowEye(.15, .15, "#7fd0ff", .07); break;
+      case "jorm": c.strokeStyle = "#1e7a3a"; c.lineWidth = r * .32; c.beginPath(); M(-.6, 0);
+        for (let k = 1; k <= 6; k++) c.lineTo(r * (-.6 + k * .2), Math.sin(T * .12 - k * 1.1) * r * .35 * (1 - k / 8)); c.stroke();
+        c.strokeStyle = "#7dff5c"; c.lineWidth = r * .06; c.stroke();
+        { const hy = Math.sin(T * .12 - 6.6) * r * .1; c.fillStyle = "#1e7a3a"; c.beginPath(); c.ellipse(r * .65, hy, r * .32, r * .24, 0, 0, 7); c.fill();
+          c.fillStyle = "#7dff5c"; c.beginPath(); c.arc(r * .75, hy - r * .1, r * .06, 0, 7); c.arc(r * .75, hy + r * .1, r * .06, 0, 7); c.fill(); } break;
+      case "valkyrie": { const fl = Math.sin(T * .2) * .25;
+        for (const s of [-1, 1]) { c.fillStyle = "#ffffff"; c.beginPath(); M(-.1, s * .25);
+          for (let k = 0; k < 4; k++) { c.quadraticCurveTo(-r * (.3 + k * .2), s * r * (.6 + fl + k * .12), -r * (.45 + k * .2), s * r * (.85 + fl * (1 - k * .2))); c.lineTo(-r * (.35 + k * .2), s * r * .35); } c.fill(); }
+        const g = c.createRadialGradient(-r * .1, -r * .15, 0, 0, 0, r * .5); g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#8a96a3"); c.fillStyle = g; c.beginPath(); c.ellipse(0, 0, r * .45, r * .4, 0, 0, 7); c.fill();
+        c.fillStyle = "#e7b54a"; c.fillRect(r * .05, -r * .4, r * .1, r * .8); c.fillRect(r * .3, -r * .05, r * .35, r * .1); break; }
+      case "sol": { c.save(); c.rotate(T * .02); c.fillStyle = "#ffcf33";
+        c.beginPath(); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; c.moveTo(Math.cos(a - .12) * r * .5, Math.sin(a - .12) * r * .5); c.lineTo(Math.cos(a) * r * (k % 2 ? .85 : 1.05), Math.sin(a) * r * (k % 2 ? .85 : 1.05)); c.lineTo(Math.cos(a + .12) * r * .5, Math.sin(a + .12) * r * .5); } c.fill(); c.restore();
+        const g = c.createRadialGradient(-r * .1, -r * .1, 0, 0, 0, r * .55); g.addColorStop(0, "#fff7c2"); g.addColorStop(1, "#f2a900"); c.fillStyle = g; c.beginPath(); c.arc(0, 0, r * .52, 0, 7); c.fill();
+        c.strokeStyle = "#b37400"; c.lineWidth = r * .05; c.beginPath(); c.arc(0, 0, r * .36, 0, 7); c.stroke(); break; }
+      case "wraith": { const fl = .6 + .4 * Math.sin(T * .35) * Math.sin(T * .13);
+        c.fillStyle = "#1a1424"; c.beginPath(); M(-.5, -.5); c.quadraticCurveTo(r * .5, -r * .55, r * .45, 0); c.quadraticCurveTo(r * .5, r * .55, -r * .5, r * .5); L(-.3, .2); L(-.5, 0); L(-.3, -.2); c.closePath(); c.fill();
+        c.fillStyle = "#000"; c.beginPath(); c.ellipse(r * .2, 0, r * .18, r * .24, 0, 0, 7); c.fill(); glowEye(.25, .08, "#9cffc8", .05);
+        c.strokeStyle = "#444"; c.lineWidth = r * .05; c.beginPath(); M(.45, .3); L(.75, .45); c.stroke();
+        c.fillStyle = `rgba(156,255,200,${.25 * fl})`; c.beginPath(); O(.8, .55, .4); c.fill(); c.fillStyle = `rgba(200,255,225,${fl})`; c.beginPath(); O(.8, .55, .12); c.fill(); break; }
+      case "yulestar": { c.fillStyle = "rgba(255,230,120,.25)"; c.beginPath(); O(0, 0, .95); c.fill(); c.save(); c.rotate(T * .03);
+        c.fillStyle = "#ffd700"; c.beginPath(); for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5 - Math.PI / 2, rr = k % 2 ? r * .3 : r * .75; k ? c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); c.fill();
+        c.strokeStyle = "#fff6c2"; c.lineWidth = r * .05; c.stroke(); c.restore(); break; }
+    }
+  }
   function drawFig(c, fig, r, rogue) {   // drawn in prow space: +x is forward
     const hx = r * 2.0, eye = rogue ? "#ff5544" : "#fff";
+    if (FIG_FX[fig]) { c.save(); c.translate(hx, 0); drawPremiumFig(c, fig, r); c.restore(); return; }
     c.save(); c.translate(hx, 0);
     switch (fig) {
       case "wolf": c.fillStyle = "#7f8c8d"; c.beginPath(); c.moveTo(r * .7, 0); c.lineTo(-r * .3, -r * .4); c.lineTo(-r * .3, r * .4); c.fill();
@@ -1090,6 +1223,7 @@ body.shorts #recHint{display:block}
     if (lb.loading) return lb.loading;
     return lb.loading = loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app-compat.js`)
       .then(() => loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore-compat.js`))
+      .then(() => loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth-compat.js`))
       .then(() => { firebase.initializeApp(FIREBASE_CONFIG); return lb.db = firebase.firestore(); })
       .catch(() => null);
   }
@@ -1124,6 +1258,49 @@ body.shorts #recHint{display:block}
   document.querySelectorAll("[data-lbtab]").forEach(b => b.onclick = () => { lb.tab = b.dataset.lbtab;
     document.querySelectorAll("[data-lbtab]").forEach(x => x.classList.toggle("on", x.dataset.lbtab === lb.tab)); watchBoard(); });
 
+  /* ===================== sign-in + cloud save =====================
+     Sign in with Google and your plunder, skins, figureheads, trails and feats are saved to your account,
+     so clearing the browser, switching phones or a new season never loses them. Uses the same Firebase project as the scoreboard. */
+  const acct = { user: null, t: 0 };
+  function mergeCloud(c) {
+    if (!c) return;
+    prof.owned = [...new Set([...(c.owned || []), ...prof.owned])];
+    prof.ach = { ...(c.ach || {}), ...prof.ach };
+    for (const k in (c.stats || {})) prof.stats[k] = Math.max(prof.stats[k] || 0, c.stats[k] || 0);
+    if ((c.t || 0) > (prof.t || 0)) { prof.plunder = c.plunder || 0; if (c.eq) prof.eq = { ...prof.eq, ...c.eq }; }   // newest save wins for plunder + what's equipped
+  }
+  function cloudSave() {
+    if (!acct.user || !lb.db) return; clearTimeout(acct.t);
+    acct.t = setTimeout(() => lb.db.collection("users").doc(acct.user.uid).set({ plunder: prof.plunder, owned: prof.owned, ach: prof.ach, eq: prof.eq, stats: prof.stats, t: prof.t || Date.now() }).catch(e => console.warn("cloud save failed", e)), 1200);
+  }
+  function paintAcct() {
+    const el = $("acct"); if (!el) return;
+    if (!FIREBASE_CONFIG) { el.innerHTML = `<small>Your skins are saved on this device.</small>`; return; }
+    el.innerHTML = acct.user ? `<small>☁️ Saved to <b>${(acct.user.displayName || acct.user.email || "your account").replace(/[<&]/g, "")}</b> · <a href="#" id="signOut">Sign out</a></small>`
+      : `<button class="btn2" id="signIn">🔐 Sign in to save your skins</button><small>Keep everything you unlock, on any phone or computer.</small>`;
+    const si = $("signIn"), so = $("signOut");
+    if (si) si.onclick = signIn;
+    if (so) so.onclick = e => { e.preventDefault(); firebase.auth().signOut(); };
+  }
+  async function signIn() {
+    const db = await fbReady(); if (!db) { toast("Couldn't reach sign-in", "Try again in a moment"); return; }
+    const pv = new firebase.auth.GoogleAuthProvider();
+    try { await firebase.auth().signInWithPopup(pv); }
+    catch (e) { if (/popup|cancel|operation-not-supported/i.test(e.code || "")) { try { await firebase.auth().signInWithRedirect(pv); } catch (e2) {} } else toast("Sign-in didn't work", "Try again in a moment"); }
+  }
+  function initAcct() {
+    paintAcct(); if (!FIREBASE_CONFIG) return;
+    fbReady().then(db => { if (!db) return;
+      firebase.auth().onAuthStateChanged(async u => {
+        acct.user = u;
+        if (u) { try { const d = await db.collection("users").doc(u.uid).get(); mergeCloud(d.exists ? d.data() : null); } catch (e) {}
+          store.set("ls_profile", JSON.stringify(prof)); cloudSave(); showPlunder(); if (!$("ward").classList.contains("hidden")) renderWard();
+          if (!$("name").value && u.displayName) $("name").value = u.displayName.split(" ")[0].slice(0, 14); }
+        paintAcct();
+      });
+    });
+  }
+
   let last = performance.now();
   function frame(now) {
     if (now - last < 10) { requestAnimationFrame(frame); return; }   // 120Hz phones: run at 60fps instead of burning 2x the battery
@@ -1141,45 +1318,71 @@ body.shorts #recHint{display:block}
   $("go").onclick = start; $("again").onclick = start;
   function showPlunder() { document.querySelectorAll("[data-plunder]").forEach(e => e.textContent = prof.plunder.toLocaleString()); }
   let wtab = "ships";
-  function preview(cnv, sk, fig) {
-    const c = cnv.getContext("2d"), w = cnv.width / 2, h = cnv.height / 2; c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, w, h);   // drawn at 2x so it's crisp on phones
-    const sea = c.createLinearGradient(0, 0, 0, h); sea.addColorStop(0, "#1a5f80"); sea.addColorStop(1, "#0d3a52"); c.fillStyle = sea; c.fillRect(0, 0, w, h);
-    const r = 20, segs = []; for (let i = 0; i < 7; i++) segs.push({ x: w * .66 - i * r * 1.05, y: h / 2 + 6 + Math.sin(i * .7) * 7, warn: -99 });
-    const a = Math.atan2(segs[0].y - segs[1].y, segs[0].x - segs[1].x);
-    // a few wake particles so you can see the trail effect
-    const wk = WAKES[sk.wake] || WAKES.foam, t = segs[segs.length - 1];
-    for (let k = 0; k < 14; k++) { const px = t.x - 6 - k * 4.5 + Math.sin(k * 2.3) * 4, py = t.y + Math.sin(k * 1.7) * 10, s = wk.s[0] + (k % 3) * (wk.s[1] - wk.s[0]) / 2;
-      c.globalAlpha = wk.a * (1 - k / 16); c.fillStyle = c.strokeStyle = wk.c ? wk.c[k % wk.c.length] : `hsl(${(k * 30) % 360},80%,65%)`;
-      c.beginPath(); if (wk.leaf) c.ellipse(px, py, s * 1.5, s * .7, k, 0, 7); else c.arc(px, py, s, 0, 7); c.fill(); }
+  // wardrobe previews are animated while the wardrobe is open (particles are worked out from the clock, so no state to keep)
+  function previewParts(c, kind, x, y, dx, dy, spread, n, t, len) {
+    const wk = WAKES[kind] || WAKES.foam;
+    for (let k = 0; k < n; k++) { const ph = (t * .0007 + k / n) % 1, s = (wk.s[0] + (k % 3) * (wk.s[1] - wk.s[0]) / 2) * (1 + wk.grow * ph * 20);
+      const px = x + dx * ph * len + Math.sin(k * 2.3 + t * .002) * spread * ph, py = y + dy * ph * len + Math.sin(k * 1.7) * spread * (.3 + ph) - (wk.rise ? ph * 12 : 0);
+      c.globalAlpha = wk.a * (1 - ph); c.fillStyle = c.strokeStyle = wk.c ? wk.c[k % wk.c.length] : kind === "bifrost" ? RAINBOW[k % 8] : `hsl(${(k * 30 + t * .1) % 360},80%,65%)`;
+      c.beginPath();
+      if (wk.spark) { c.moveTo(px, py - s * 1.5); c.lineTo(px + s * .4, py); c.lineTo(px, py + s * 1.5); c.lineTo(px - s * .4, py); c.moveTo(px - s * 1.5, py); c.lineTo(px, py - s * .4); c.lineTo(px + s * 1.5, py); c.lineTo(px, py + s * .4); c.fill(); }
+      else if (wk.line) { c.lineWidth = 1.6; c.moveTo(px - s, py); c.lineTo(px + s * .3, py + s); c.stroke(); }
+      else if (wk.leaf) { c.ellipse(px, py, s * 1.5, s * .7, k + ph * 3, 0, 7); c.fill(); }
+      else { c.arc(px, py, s, 0, 7); c.fill(); } }
     c.globalAlpha = 1;
-    drawShipBody(c, sk, fig, segs, r, a, { boosting: false, rogue: false, warned: null });
+  }
+  function preview(cnv, sk, fig, trail, zoom) {
+    const c = cnv.getContext("2d"), w = cnv.width / 2, h = cnv.height / 2, t = performance.now(); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, w, h);   // drawn at 2x so it's crisp on phones
+    const sea = c.createLinearGradient(0, 0, 0, h); sea.addColorStop(0, "#1a5f80"); sea.addColorStop(1, "#0d3a52"); c.fillStyle = sea; c.fillRect(0, 0, w, h);
+    if (zoom) { c.translate(-w * .78, -h * .48); c.scale(1.75, 1.75); }   // figureheads: lean in on the prow
+    const r = 20, segs = []; for (let i = 0; i < 7; i++) segs.push({ x: w * .66 - i * r * 1.05, y: h / 2 + 6 + Math.sin(i * .7) * 7, warn: -99 });
+    const a = Math.atan2(segs[0].y - segs[1].y, segs[0].x - segs[1].x), tl = segs[segs.length - 1];
+    const tr = trail && trail.wake ? trail : null;
+    previewParts(c, (tr && tr.wake) || sk.wake, tl.x - 4, tl.y, -1, 0, 9, 18, t, 90);
+    drawShipBody(c, sk, fig, segs, r, a, { boosting: false, rogue: false, warned: null, trail: tr });
+    const fx = FIG_FX[fig];
+    if (fx) { const hx = segs[0].x + Math.cos(a) * r * 2.1, hy = segs[0].y + Math.sin(a) * r * 2.1;
+      if (fx[1] === "breath") previewParts(c, fx[0], hx + r * .8, hy, 1, 0, 6, 12, t, 45);
+      else if (fx[1] === "up") previewParts(c, fx[0], hx, hy, -.4, -.6, 8, 12, t, 40);
+      else previewParts(c, fx[0], hx, hy, 0, 0, 22, 12, t, 1); }
+  }
+  let wardAnim = 0;
+  function animWard() {
+    clearInterval(wardAnim);
+    wardAnim = setInterval(() => { if ($("ward").classList.contains("hidden")) { clearInterval(wardAnim); return; }
+      const curSkin = SKINS.find(k => k.id === prof.eq.skin) || SKINS[0], curTrail = TRAILS.find(x => x.id === prof.eq.trail);
+      $("wardGrid").querySelectorAll("[data-pv]").forEach(cnv => { const b = cnv.getBoundingClientRect(); if (b.bottom < 0 || b.top > innerHeight) return; const id = cnv.dataset.pv;
+        if (wtab === "ships") preview(cnv, SKINS.find(k => k.id === id), prof.eq.fig, curTrail);
+        else if (wtab === "figs") preview(cnv, curSkin, id, curTrail, true);
+        else preview(cnv, curSkin, prof.eq.fig, TRAILS.find(x => x.id === id)); }); }, COARSE ? 70 : 45);
   }
   function renderWard() {
     showPlunder();
-    const list = (wtab === "ships" ? SKINS : FIGS).filter(it => inSeason(it) || unlocked(it)).sort((x, y) => (y.season === SEASON && !!SEASON) - (x.season === SEASON && !!SEASON)), eqId = wtab === "ships" ? prof.eq.skin : prof.eq.fig;
+    const slot = SLOT[wtab], list = TAB_LIST[wtab].filter(it => inSeason(it) || unlocked(it)).sort((x, y) => (y.season === SEASON && !!SEASON) - (x.season === SEASON && !!SEASON)), eqId = prof.eq[slot];
     const curSkin = SKINS.find(k => k.id === prof.eq.skin) || SKINS[0];
     $("wardGrid").innerHTML = list.map(it => { const un = unlocked(it), eq = it.id === eqId;
       const how = (it.season ? SEASON_LABEL[it.season] + " · " : "") + (it.un.t === "free" ? "Starter" : it.un.t === "buy" ? `${it.un.cost.toLocaleString()} plunder` : it.un.label);
       const btn = eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` :
         it.un.t === "buy" ? `<button data-buy="${it.id}" ${prof.plunder < it.un.cost ? "disabled" : ""}>Buy · ${it.un.cost.toLocaleString()}</button>` : `<button disabled>🔒 Feat</button>`;
       return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"}">${un ? "" : `<span class="tag">🔒</span>`}<canvas width="520" height="220" data-pv="${it.id}"></canvas>
-        <b>${it.name}</b>${wtab === "ships" ? `<em class="wk">${WAKE_NAME[it.wake] || ""} trail</em>` : ""}<small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
-    $("wardGrid").querySelectorAll("[data-pv]").forEach(cnv => { const id = cnv.dataset.pv;
-      if (wtab === "ships") preview(cnv, SKINS.find(k => k.id === id), prof.eq.fig); else preview(cnv, curSkin, id); });
+        <b>${it.name}</b>${wtab === "ships" ? `<em class="wk">${WAKE_NAME[it.wake] || ""} trail</em>` : wtab === "figs" && FIG_FX[it.id] ? `<em class="wk">✨ ${WAKE_NAME[FIG_FX[it.id][0]]}</em>` : wtab === "trails" ? `<em class="wk">${it.id === "skin" ? "Matches your skin" : it.aura ? "+ shield glow" : "No glow"}</em>` : ""}<small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
+    animWard();
   }
+  const SLOT = { ships: "skin", figs: "fig", trails: "trail" }, TAB_LIST = { ships: SKINS, figs: FIGS, trails: TRAILS };
   $("wardGrid").addEventListener("click", e => {
     const eq = e.target.closest("[data-eq]"), buy = e.target.closest("[data-buy]");
-    if (eq) { prof.eq[wtab === "ships" ? "skin" : "fig"] = eq.dataset.eq; saveProf(); renderWard(); }
-    if (buy) { const it = [...SKINS, ...FIGS].find(x => x.id === buy.dataset.buy); if (it && prof.plunder >= it.un.cost) {
-      prof.plunder -= it.un.cost; prof.owned.push(it.id); prof.eq[wtab === "ships" ? "skin" : "fig"] = it.id; saveProf(); renderWard(); } }
+    if (eq) { prof.eq[SLOT[wtab]] = eq.dataset.eq; saveProf(); renderWard(); }
+    if (buy) { const it = TAB_LIST[wtab].find(x => x.id === buy.dataset.buy); if (it && prof.plunder >= it.un.cost && !prof.owned.includes(it.id)) {
+      prof.plunder -= it.un.cost; prof.owned.push(it.id); prof.eq[SLOT[wtab]] = it.id; saveProf(); renderWard(); } }
   });
   document.querySelectorAll("#ward [data-tab]").forEach(b => b.onclick = () => { wtab = b.dataset.tab;
     document.querySelectorAll("#ward [data-tab]").forEach(x => x.classList.toggle("on", x === b)); renderWard(); });
   const openWard = () => { $("ward").classList.remove("hidden"); renderWard(); };
   $("wardBtn").onclick = openWard; $("wardBtn2").onclick = openWard; $("wardClose").onclick = () => { $("ward").classList.add("hidden"); showPlunder(); };
-  showPlunder();
+  showPlunder(); initAcct();
   $("lbBtn").onclick = () => { const el = $("startLb"), open = el.classList.toggle("hidden") === false; if (open) watchBoard(); else stopBoard(); };
   $("name").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+  if (location.hash === "#scores") $("lbBtn").click();   // "High scores" link from the games page opens the board
   requestAnimationFrame(t => { last = t; frame(t); });
 })();
 </script>
