@@ -476,7 +476,7 @@ body.shorts #sndBar{display:none}
     if (player && player.alive) {
       cGrid.clear(); for (const s of ships) if (s.alive && s !== player && !s.hidden) { const sg = s.segs; for (let j = 1; j < sg.length; j++) cGrid.add(sg[j].x, sg[j].y, sg[j]); }
       const pr = radius(player), hx = player.x + Math.cos(player.a) * pr * 1.2, hy = player.y + Math.sin(player.a) * pr * 1.2, rs = pr * .55;
-      cGrid.near(hx, hy, 130, v => { if (v.s.buffs.ghost) return;
+      if (!player.buffs.ghost) cGrid.near(hx, hy, 130, v => { if (v.s.buffs.ghost) return;   // Ghost Ship sails through ships, so no ship warnings while it's up
         const lim = radius(v.s) * .78 + rs + 55; if (Sim.d2(hx, hy, v.x, v.y) < lim * lim) { v.warn = tick; sfx.warn(); } });
       warnIsle = hitIsle(hx, hy, 45); }
     for (const s of ships) if (s.alive && !s.hidden) wakeFor(s, f); stepParts(f);
