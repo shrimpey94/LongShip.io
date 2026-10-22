@@ -10,7 +10,9 @@
    The ONE secret is the bot token. It lives in Cloudflare (Workers → busterrdust → Settings → Variables and Secrets,
    name DISCORD_TOKEN, type Secret). Never paste it into this file. Everything in CFG below is public. */
 
-const CFG = {
+import { VV, handleVV, scheduledVV } from "./vvbot.js";
+
+export const CFG = {
   appId: "1562689816272044124",           // Discord Developer Portal → Longship Bot → General Information → Application ID
   publicKey: "46ea8fe1294fbf787e77d0ee9d9ecc94eaa6ffd67564120b2ffe7fa19462e169",       // same page → Public Key (public, used to check that requests really come from Discord)
   guildId: "1562684014618222736",                 // the LongShip.io server
@@ -19,9 +21,9 @@ const CFG = {
 };
 const FIREBASE_CONFIG = { projectId: "longshipio", apiKey: "AIzaSyB2_bXBgJkOoWoo0Otzjba2u2i3XeWtzTs" };   // public web config (same as the game)
 
-const API = "https://discord.com/api/v10";
+export const API = "https://discord.com/api/v10";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json" } });
+export const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json" } });
 
 /* ---------------- small key/value store (one Durable Object) ---------------- */
 export class BotState {
@@ -33,11 +35,11 @@ export class BotState {
   }
 }
 const store = env => env.BOT.get(env.BOT.idFromName("longship-bot"));
-const kget = async (env, key) => (await (await store(env).fetch("https://bot/", { method: "POST", body: JSON.stringify({ op: "get", key }) })).json()).val;
-const kput = (env, key, val) => store(env).fetch("https://bot/", { method: "POST", body: JSON.stringify({ op: "put", key, val }) });
+export const kget = async (env, key) => (await (await store(env).fetch("https://bot/", { method: "POST", body: JSON.stringify({ op: "get", key }) })).json()).val;
+export const kput = (env, key, val) => store(env).fetch("https://bot/", { method: "POST", body: JSON.stringify({ op: "put", key, val }) });
 
 /* ---------------- Discord REST ---------------- */
-async function api(env, method, path, body, reason) {
+export async function api(env, method, path, body, reason) {
   for (let tries = 0; tries < 5; tries++) {
     const headers = { Authorization: "Bot " + env.DISCORD_TOKEN, "User-Agent": "DiscordBot (https://busterrdust.com, 1.0)" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -50,7 +52,7 @@ async function api(env, method, path, body, reason) {
   throw new Error(`${method} ${path} → rate limited`);
 }
 // follow-up to an interaction (uses the interaction token, no bot token needed)
-const editReply = (token, body) => fetch(`${API}/webhooks/${CFG.appId}/${token}/messages/@original`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+export const editReply = (token, body) => fetch(`${API}/webhooks/${CFG.appId}/${token}/messages/@original`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /* ---------------- request signature check ---------------- */
 const hex = h => new Uint8Array((h.match(/../g) || []).map(b => parseInt(b, 16)));
@@ -169,6 +171,7 @@ export async function handleDiscord(request, env, ctx) {
   if (!(await verified(request, body))) return new Response("bad signature", { status: 401 });
   const it = JSON.parse(body);
   if (it.type === 1) return json({ type: 1 });   // Discord's "are you there?" check
+  if (it.guild_id === VV.guildId) return handleVV(it, env, ctx);   // the VikingVale server has its own commands (vvbot.js)
 
   if (it.type === 3 && it.data.custom_id === "alerts") {   // the 🔔 button in #welcome
     try { return reply(await toggleAlerts(env, it.member), true); } catch (e) { return reply("Couldn't change your alerts right now. Try `/alerts` in a minute.", true); }
@@ -195,9 +198,9 @@ export async function handleDiscord(request, env, ctx) {
 }
 
 /* ---------------- /setup-server ---------------- */
-const P = { VIEW: 1n << 10n, SEND: 1n << 11n, REACT: 1n << 6n, THREADS_PUB: 1n << 35n, THREADS_PRIV: 1n << 36n, SEND_THREADS: 1n << 38n };
-const bits = (...b) => b.reduce((a, x) => a | x, 0n).toString();
-const T = { TEXT: 0, VOICE: 2, CATEGORY: 4, NEWS: 5, STAGE: 13, FORUM: 15 };
+export const P = { VIEW: 1n << 10n, SEND: 1n << 11n, REACT: 1n << 6n, THREADS_PUB: 1n << 35n, THREADS_PRIV: 1n << 36n, SEND_THREADS: 1n << 38n };
+export const bits = (...b) => b.reduce((a, x) => a | x, 0n).toString();
+export const T = { TEXT: 0, VOICE: 2, CATEGORY: 4, NEWS: 5, STAGE: 13, FORUM: 15 };
 
 async function setupServer(env) {
   const G = CFG.guildId, log = [];
@@ -310,23 +313,29 @@ async function setupServer(env) {
 }
 
 /* ---------------- every 10 minutes ---------------- */
+// The channel's public feed. Only PUBLIC videos are in it, so unlisted uploads are never announced.
+export async function youtubeFeed() {
+  const r = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${CFG.ytChannelId}`, { headers: { "User-Agent": "Mozilla/5.0 (LongshipBot)" } });
+  if (!r.ok) return null;
+  const xml = await r.text(), un = t => t.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(m => {
+    const e = m[1], get = re => ((e.match(re) || [])[1] || "");
+    return { id: get(/<yt:videoId>([^<]+)</), title: un(get(/<title>([^<]*)</)).replace(/#shorts/ig, "").trim(), desc: un(get(/<media:description>([\s\S]*?)<\/media:description>/)), published: get(/<published>([^<]+)</) };
+  }).filter(v => v.id);
+}
 export async function scheduledBot(env) {
   if (!env.DISCORD_TOKEN || !CFG.appId) return;
+  await scheduledVV(env).catch(e => console.log("VikingVale Bot:", e.message));   // the VikingVale server (vvbot.js)
   await syncCommands(env).catch(e => console.log("commands", e.message));
   const ch = await kget(env, "channels"); if (!ch || !ch.drops) return;   // waits until /setup-server has been run
   const role = await kget(env, "roleAlerts");
-  const r = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${CFG.ytChannelId}`, { headers: { "User-Agent": "Mozilla/5.0 (LongshipBot)" } });
-  if (!r.ok) return;
-  const xml = await r.text();
-  const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(m => {
-    const e = m[1], get = re => ((e.match(re) || [])[1] || "");
-    return { id: get(/<yt:videoId>([^<]+)</), title: get(/<title>([^<]*)</), desc: get(/<media:description>([\s\S]*?)<\/media:description>/), published: get(/<published>([^<]+)</) };
-  }).filter(v => v.id && /longship/i.test(v.title + " " + v.desc));
+  const all = await youtubeFeed(); if (!all) return;
+  const entries = all.filter(v => /longship/i.test(v.title + " " + v.desc));
   let seen = await kget(env, "ytSeen");
   if (!seen) { await kput(env, "ytSeen", entries.map(v => v.id)); return; }   // first run: remember what's already out, post nothing
   const fresh = entries.filter(v => !seen.includes(v.id)).reverse();   // oldest first
   for (const v of fresh) {
-    const title = v.title.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/#shorts/i, "").trim();
+    const title = v.title;
     await api(env, "POST", `/channels/${ch.drops}/messages`, {
       content: `${role ? `<@&${role}> ` : ""}🎬 **New video just dropped!** ${title}\nhttps://youtube.com/shorts/${v.id}`,
       allowed_mentions: { roles: role ? [role] : [] },
