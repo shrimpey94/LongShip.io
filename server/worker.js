@@ -3,10 +3,23 @@
    Only two paths come here:
      /games/longship/lobby    → hands the player to a Longship.io lobby (one Durable Object per lobby)
      /games/longship/discord  → Longship Bot, the Discord app for the LongShip.io server (server/bot.js)
+     /api/visits              → the visit counter on the games page (GET reads it, POST adds one visit)
    The cron in wrangler.jsonc runs Longship Bot's check for new videos every 10 minutes. */
 import { Lobby } from "./lobby.js";
 import { BotState, handleDiscord, scheduledBot } from "./bot.js";
 export { Lobby, BotState };
+
+// Visit counter. The page only POSTs once per browser every 30 minutes (refreshing doesn't add more),
+// and obvious bots and link previews are ignored. The number lives in the bot's storage under "visits".
+const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|headless|lighthouse|pingdom|curl|wget|python|discord/i;
+async function visits(request, env) {
+  const store = env.BOT.get(env.BOT.idFromName("site-counters"));
+  const human = !BOTS.test(request.headers.get("User-Agent") || "");
+  const op = request.method === "POST" && human ? "add" : "get";
+  const r = await store.fetch("https://bot/", { method: "POST", body: JSON.stringify({ op, key: "visits" }) });
+  const { val } = await r.json();
+  return new Response(JSON.stringify({ visits: val || 0 }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -16,6 +29,7 @@ export default {
       return env.LOBBY.get(env.LOBBY.idFromName("lobby-" + n)).fetch(request);
     }
     if (url.pathname === "/games/longship/discord") return handleDiscord(request, env, ctx);
+    if (url.pathname === "/api/visits") return visits(request, env);
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {

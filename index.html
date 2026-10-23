@@ -1482,5 +1482,18 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   requestAnimationFrame(t => { last = t; frame(t); });
 })();
 </script>
+<script>
+/* Visit counter (busterrdust.com/api/visits). Counts once per browser every 30 minutes, so refreshing doesn't pump it up. */
+(function () {
+  var el = document.getElementById("visitCount"), now = Date.now(), last = 0;
+  try { last = +localStorage.getItem("bd_visit") || 0; } catch (e) {}
+  var add = now - last > 30 * 60 * 1000;
+  if (add) try { localStorage.setItem("bd_visit", String(now)); } catch (e) {}
+  if (!/^https?:$/.test(location.protocol)) return;
+  fetch("/api/visits", { method: add ? "POST" : "GET" }).then(function (r) { return r.json(); }).then(function (j) {
+    if (!el || !j.visits) return; el.querySelector("b").textContent = j.visits.toLocaleString(); el.hidden = false;
+  }).catch(function () {});
+})();
+</script>
 </body>
 </html>

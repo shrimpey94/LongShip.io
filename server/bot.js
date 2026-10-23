@@ -31,6 +31,7 @@ export class BotState {
   async fetch(req) {
     const { op, key, val } = await req.json();
     if (op === "put") { await this.ctx.storage.put(key, val); return json({ ok: true }); }
+    if (op === "add") { const n = ((await this.ctx.storage.get(key)) || 0) + (val || 1); await this.ctx.storage.put(key, n); return json({ val: n }); }   // counters (one at a time, so nothing is lost)
     return json({ val: (await this.ctx.storage.get(key)) ?? null });
   }
 }
