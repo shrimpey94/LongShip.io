@@ -55,8 +55,17 @@
   const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
   const d2 = (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2;
   const pick = a => a[(Math.random() * a.length) | 0];
-  const radius = s => 9 + Math.min(15, Math.sqrt(s.len) * 1.25);
+  /* Shield wall growth. "len" is still the shield count (your score); these decide how it looks.
+     WALL_*: every shield adds a piece while you're small, then pieces taper off (100 shields ≈ 75 pieces, 300 ≈ 128, 1000 ≈ 191).
+     Width: starts at 12.5 and widens slowly to double (+100%) at 900 shields, then stops. That's the cap.
+            50 shields ≈ +16%, 100 ≈ +26%, 150 ≈ +33%, 250 ≈ +46%, 400 ≈ +61%, 600 ≈ +78%. */
+  const WALL_FULL = 30, WALL_EASE = 55;
+  const segCount = len => len <= WALL_FULL ? len : Math.round(WALL_FULL + WALL_EASE * Math.log(1 + (len - WALL_FULL) / WALL_EASE));
+  const R_START = 12.5, R_GROW = 1.0, R_FULL_AT = 900, R_TABLE = new Float32Array(R_FULL_AT + 1);   // R_GROW 1.0 = the +100% cap
+  for (let n = 0; n <= R_FULL_AT; n++) R_TABLE[n] = R_START * (1 + R_GROW * Math.pow(Math.max(0, n - BASE_LEN) / (R_FULL_AT - BASE_LEN), 0.6));
+  const radius = s => R_TABLE[s.len >= R_FULL_AT ? R_FULL_AT : s.len > 0 ? s.len | 0 : 0];
   const gap = s => radius(s);
+  let maxR = 24;   // widest ship on the sea this frame: nearby-searches reach this far
 
   /* ---------- spatial grids: fixed cell arrays emptied and refilled each frame (no garbage) ---------- */
   const CELL = 160, GN = Math.ceil(W / CELL);
@@ -75,7 +84,8 @@
     let n = 0, px = s.x, py = s.y, need = sp, k = P.length - 1;
     let o = segs[0] || (segs[0] = { s, i: 0, x: 0, y: 0, warn: -99 }); o.x = px; o.y = py; o.s = s; n = 1;
     let bx0 = px, bx1 = px, by0 = py, by1 = py;
-    while (n <= s.len && k >= 0) {
+    const want = segCount(s.len);
+    while (n <= want && k >= 0) {
       const q = P[k], dx = q.x - px, dy = q.y - py, d = Math.sqrt(dx * dx + dy * dy);
       if (d >= need) { const t = need / d; px += dx * t; py += dy * t; need = sp;
         o = segs[n] || (segs[n] = { s, i: n, x: 0, y: 0, warn: -99 }); o.x = px; o.y = py; o.s = s; n++;
@@ -252,7 +262,7 @@
     if (x < 120 || y < 120 || x > W - 120 || y > W - 120) return 3;
     for (const o of this.isles) if (d2(x, y, o.x, o.y) < (o.r + margin + 30) ** 2) return 3;
     let hit = 0;
-    this.segGrid.near(x, y, margin + 30, v => {
+    this.segGrid.near(x, y, margin + 30 + Math.max(0, maxR - 24), v => {
       if (v.s === b && v.i < 10) return;
       const rr = (radius(v.s) + margin) ** 2;
       if (d2(x, y, v.x, v.y) < rr) { hit = (v.s.buffs.ghost || v.s.solidify) && v.s !== b ? 0 : 2; return false; }
@@ -317,7 +327,7 @@
         const b = { x1: s.x, y1: s.y, x2: mid.x, y2: mid.y, t: 30 }; this.bolts.push(b); if (this.track) this.newBolts.push(b); hit = tgt;
         if (tgt.len < 20) this.sink(tgt, s, "bolt");
         else { const keep = Math.ceil(tgt.len / 2), lost = tgt.len - keep;
-          this.spill(tgt.segs.slice(keep), Math.round(lost * 3 * .8)); tgt.len = keep; buildSegs(tgt);
+          this.spill(tgt.segs.slice(Math.ceil(tgt.segs.length / 2)), Math.round(lost * 3 * .8)); tgt.len = keep; buildSegs(tgt);
           if (this.h.struck) this.h.struck(tgt, s, lost); }
       }
     } else s.buffs[p.id] = { t: p.dur * 60, max: p.dur * 60 };
@@ -361,10 +371,11 @@
     gold.length = gw;
     for (const s of ships) if (s.alive && s.len > s.peak) s.peak = s.len;
     // prow vs shields (real players get a slightly smaller prow: their screen is a moment behind the server)
+    maxR = 24; for (const s of ships) if (s.alive) { const r = radius(s); if (r > maxR) maxR = r; }
     for (const s of ships) {
       if (!s.alive || s.buffs.ghost || s.invuln || s.solidify) continue;
       const rs = radius(s) * (s.remote ? .45 : .55); let hitBy = null;
-      this.segGrid.near(s.x, s.y, 60, v => { if (v.s === s || !v.s.alive || v.i === 0 || v.s.buffs.ghost || v.s.solidify) return;
+      this.segGrid.near(s.x, s.y, 36 + maxR, v => { if (v.s === s || !v.s.alive || v.i === 0 || v.s.buffs.ghost || v.s.solidify) return;
         if (d2(s.x, s.y, v.x, v.y) < (radius(v.s) * .78 + rs) ** 2) { hitBy = v.s; return false; } });
       if (hitBy) this.sink(s, hitBy, "ship");
     }
@@ -382,5 +393,5 @@
   };
 
   root.LongshipSim = { W, SPEED, BOOST, TURN, BASE_LEN, BOTS, GOLD_TARGET, POWER_TARGET, PSTEP, POWERS, LOOT, LOOT_TYPES, GEM_HUES, SEASONS, MAX_SPEED,
-    seasonOf, rnd, clamp, angDiff, d2, radius, gap, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
+    seasonOf, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
 })(typeof globalThis !== "undefined" ? globalThis : this);
