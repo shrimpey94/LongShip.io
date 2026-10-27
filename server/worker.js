@@ -4,9 +4,11 @@
      /games/longship/lobby    → hands the player to a Longship.io lobby (one Durable Object per lobby)
      /games/longship/discord  → Longship Bot, the Discord app for the LongShip.io server (server/bot.js)
      /api/visits              → the visit counter on the games page (GET reads it, POST adds one visit)
+     /api/store/…             → the Gold Runes store (server/store.js). Closed until its Stripe + Firebase secrets are set.
    The cron in wrangler.jsonc runs Longship Bot's check for new videos every 10 minutes. */
 import { Lobby } from "./lobby.js";
 import { BotState, handleDiscord, scheduledBot } from "./bot.js";
+import { handleStore } from "./store.js";
 export { Lobby, BotState };
 
 // Visit counter. The page only POSTs once per browser every 30 minutes (refreshing doesn't add more),
@@ -30,6 +32,7 @@ export default {
     }
     if (url.pathname === "/games/longship/discord") return handleDiscord(request, env, ctx);
     if (url.pathname === "/api/visits") return visits(request, env);
+    if (url.pathname.startsWith("/api/store/")) return handleStore(request, env);
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {
