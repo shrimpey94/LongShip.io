@@ -544,7 +544,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   function setPowers(list) { powers = list.map(([id, x, y, pi, life]) => ({ id, x, y, p: Sim.POWERS[pi], life, t: (id % 60) / 10 })); }
   function addNetShip([id, name, kind, skinId, fig, trailId, boss, human]) {
     if (net.byId.has(id)) return;
-    const s = { id, name, kind, skinId, fig, trailId, boss: !!boss, human: !!human, alive: true, hidden: true, x: 0, y: 0, a: 0, len: 8, kills: 0, peak: 8, buf: [], path: [], segs: [], buffs: {} };
+    const s = { id, name, kind, skinId, fig, trailId, boss: !!boss, human: !!human, alive: true, hidden: true, x: 0, y: 0, a: 0, len: BASE_LEN, kills: 0, peak: BASE_LEN, buf: [], path: [], segs: [], buffs: {} };
     dress(s); net.byId.set(id, s); ships.push(s);
     if (id === net.meId) adoptMe(s);
   }
@@ -1288,9 +1288,13 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     if (!FIREBASE_CONFIG) { paintBoard([], "🏆 The live scoreboard isn't switched on yet. Real scores will show here once it is."); return; }
     paintBoard([], "Loading the scoreboard…");
     const db = await fbReady(); if (!db) { paintBoard([], "Couldn't reach the scoreboard right now."); return; }
-    const q = (lb.tab === "today" ? db.collection("daily").doc(dayKey()).collection("scores") : db.collection("scores")).orderBy("score", "desc").limit(10);
+    // Today: every run counts. All-time: each player appears once, with their personal best (matched by name).
+    const allTime = lb.tab !== "today";
+    const q = (allTime ? db.collection("scores") : db.collection("daily").doc(dayKey()).collection("scores")).orderBy("score", "desc").limit(allTime ? 80 : 10);
     lb.unsub = q.onSnapshot(snap => {   // live: new scores pop in while you're looking
-      const rows = lb.rows = snap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+      let rows = snap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+      if (allTime) { const seen = new Set(); rows = rows.filter(r => { const k = String(r.name || "").trim().toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 10); }
+      lb.rows = rows;
       paintBoard(rows, rows.length ? "" : lb.tab === "today" ? "No scores yet today. Set sail and claim #1!" : "No scores yet. Be the first legend!");
     }, () => paintBoard([], "Couldn't reach the scoreboard right now."));
   }
@@ -1483,11 +1487,11 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 })();
 </script>
 <script>
-/* Visit counter (busterrdust.com/api/visits). Counts once per browser every 30 minutes, so refreshing doesn't pump it up. */
+/* Visit counter (busterrdust.com/api/visits). Counts each browser once a day, so refreshing or coming back later doesn't pump it up. */
 (function () {
   var el = document.getElementById("visitCount"), now = Date.now(), last = 0;
   try { last = +localStorage.getItem("bd_visit") || 0; } catch (e) {}
-  var add = now - last > 30 * 60 * 1000;
+  var add = now - last > 24 * 60 * 60 * 1000;
   if (add) try { localStorage.setItem("bd_visit", String(now)); } catch (e) {}
   if (!/^https?:$/.test(location.protocol)) return;
   fetch("/api/visits", { method: add ? "POST" : "GET" }).then(function (r) { return r.json(); }).then(function (j) {

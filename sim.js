@@ -9,7 +9,8 @@
   const W = 8000;                    // world size
   const SPEED = 1.15, BOOST = 2.3;   // px per frame at 60fps
   const TURN = 0.045;
-  const BASE_LEN = 8, BOTS = 34, GOLD_TARGET = 5000, ISLES = 22, POWER_TARGET = 34;
+  const BASE_LEN = 21,   // every ship starts with 21 shields (so an early Mjölnir strike can't sink a brand-new player)
+        BOTS = 34, GOLD_TARGET = 5000, ISLES = 22, POWER_TARGET = 34;
   const PSTEP = 3;                   // the wake is remembered as a point every 3px
   const POWERS = [   // rarity 0 common .. 3 legendary
     { id: "oars",   icon: "⛵", name: "Swift Oars",     r: 0, w: 30, dur: 8,  note: "Row faster for free" },
@@ -57,13 +58,19 @@
   const pick = a => a[(Math.random() * a.length) | 0];
   /* Shield wall growth. "len" is still the shield count (your score); these decide how it looks.
      WALL_*: every shield adds a piece while you're small, then pieces taper off (100 shields ≈ 75 pieces, 300 ≈ 128, 1000 ≈ 191).
-     Width: starts at 12.5 and widens slowly to double (+100%) at 900 shields, then stops. That's the cap.
-            50 shields ≈ +16%, 100 ≈ +26%, 150 ≈ +33%, 250 ≈ +46%, 400 ≈ +61%, 600 ≈ +78%. */
+     Width (12.5 at the 21-shield start):
+       21 → 900 shields:   widens slowly to double (+100%).   100 ≈ +23%, 250 ≈ +43%, 500 ≈ +68%
+       900 → 1000:         holds at double
+       1000 → 2500:        widens again, up to 60% more (3.2x the start), then stops for good */
   const WALL_FULL = 30, WALL_EASE = 55;
   const segCount = len => len <= WALL_FULL ? len : Math.round(WALL_FULL + WALL_EASE * Math.log(1 + (len - WALL_FULL) / WALL_EASE));
-  const R_START = 12.5, R_GROW = 1.0, R_FULL_AT = 900, R_TABLE = new Float32Array(R_FULL_AT + 1);   // R_GROW 1.0 = the +100% cap
-  for (let n = 0; n <= R_FULL_AT; n++) R_TABLE[n] = R_START * (1 + R_GROW * Math.pow(Math.max(0, n - BASE_LEN) / (R_FULL_AT - BASE_LEN), 0.6));
-  const radius = s => R_TABLE[s.len >= R_FULL_AT ? R_FULL_AT : s.len > 0 ? s.len | 0 : 0];
+  const R_START = 12.5, R_FIRST_AT = 900, R_AGAIN_AT = 1000, R_MAX_AT = 2500, R_TABLE = new Float32Array(R_MAX_AT + 1);
+  for (let n = 0; n <= R_MAX_AT; n++) {
+    const first = 1 + Math.pow(Math.min(1, Math.max(0, n - BASE_LEN) / (R_FIRST_AT - BASE_LEN)), 0.6);              // 1x → 2x
+    const again = 1 + .6 * Math.pow(Math.min(1, Math.max(0, n - R_AGAIN_AT) / (R_MAX_AT - R_AGAIN_AT)), 0.7);      // then x1.0 → x1.6
+    R_TABLE[n] = R_START * first * again;
+  }
+  const radius = s => R_TABLE[s.len >= R_MAX_AT ? R_MAX_AT : s.len > 0 ? s.len | 0 : 0];
   const gap = s => radius(s);
   let maxR = 24;   // widest ship on the sea this frame: nearby-searches reach this far
 

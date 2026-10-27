@@ -127,9 +127,10 @@ async function topScores(board) {
   const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
   const url = (board === "all" ? base : `${base}/daily/${day}`) + `:runQuery?key=${FIREBASE_CONFIG.apiKey}`;
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Referer: "https://busterrdust.com/" },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "scores" }], orderBy: [{ field: { fieldPath: "score" }, direction: "DESCENDING" }], limit: 5 } }) });
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "scores" }], orderBy: [{ field: { fieldPath: "score" }, direction: "DESCENDING" }], limit: board === "all" ? 60 : 5 } }) });
   if (!r.ok) throw new Error("scores " + r.status);
-  const rows = (await r.json()).filter(x => x.document).map(x => x.document.fields);
+  let rows = (await r.json()).filter(x => x.document).map(x => x.document.fields);
+  if (board === "all") { const seen = new Set(); rows = rows.filter(f => { const k = String(f.name?.stringValue || "").trim().toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5); }   // all-time: each player once, their best
   const medal = ["🥇", "🥈", "🥉", "4.", "5."];
   const title = board === "all" ? "🏆 All-time top 5" : "🏆 Today's top 5";
   if (!rows.length) return `${title}\nNo scores yet${board === "all" ? "" : " today"}. Set sail and claim #1! ${CFG.site}`;
