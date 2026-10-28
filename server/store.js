@@ -22,6 +22,9 @@
 
 const PROJECT = "longshipio";
 const GAME_URL = "https://busterrdust.com/games/longship/";
+// Stripe tax category. Required with Stripe Managed Payments (Stripe is the seller of record and handles sales tax).
+// txcd_10201000 = "Video Games - non subscription - with permanent rights" (Runes and skins are kept forever).
+const TAX_CODE = "txcd_10201000";
 
 /* ---------------- catalog (prices live ONLY here) ----------------
    100 Runes = $1. Skin prices in Runes and in dollars always match.
@@ -212,7 +215,8 @@ export async function handleStore(request, env, deps = {}) {
         client_reference_id: me.uid,
         customer_email: me.email || undefined,
         line_items: { 0: { quantity: 1, price_data: { currency: "usd", unit_amount: it.cents,
-          product_data: { name: it.kind === "pack" ? `${it.name} · ${it.runes.toLocaleString("en-US")} Gold Runes` : `${it.name} skin (Longship.io)` } } } },
+          product_data: { name: it.kind === "pack" ? `${it.name} · ${it.runes.toLocaleString("en-US")} Gold Runes` : `${it.name} skin (Longship.io)`,
+            tax_code: TAX_CODE } } } },
         metadata: { uid: me.uid, item: it.id },
         payment_intent_data: { metadata: { uid: me.uid, item: it.id } },
         // (no custom_text: Stripe Managed Payments, on by default for this account, doesn't allow it. The store screen shows the terms.)
@@ -240,6 +244,8 @@ export async function handleStore(request, env, deps = {}) {
     return json({ error: "Not found" }, 404);
   } catch (e) {
     console.log("store:", e.message);
+    // Stripe's own error messages are safe to show (no keys in them) and say exactly what to fix.
+    if (e.message.startsWith("Stripe: ")) return json({ error: e.message }, 502);
     return json({ error: "Something went wrong. Nothing was charged twice; try again in a minute." }, 500);
   }
 }
