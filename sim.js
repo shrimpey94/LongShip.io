@@ -61,6 +61,8 @@
   // when a season's items are on sale / next go on sale
   function itemWindow(id, t) { return seasonWindows(t, true).find(w => w.id === id && t >= w.start && t < w.end) || null; }
   function nextItemWindow(id, t) { return seasonWindows(t, true).find(w => w.id === id && w.start > t) || null; }
+  // when a season's SEA (boss, feats) is on now or next starts: used to say "earn from Nov 20"
+  function seaWindow(id, t) { return seasonWindows(t).find(w => w.id === id && t < w.end) || null; }
   function seasonOf(d) { const w = seasonAt(+d); return w ? w.id : null; }
   // looks the bots can wear (the browser owns the art for every id)
   const BOT_SKINS = { all: ["fjord", "glacier", "forest", "raven", "frost", "jarl", "aurora", "thunder", "kraken", "blood", "ember", "valhalla"],
@@ -419,5 +421,5 @@
   };
 
   root.LongshipSim = { W, SPEED, BOOST, TURN, BASE_LEN, BOTS, GOLD_TARGET, POWER_TARGET, PSTEP, POWERS, LOOT, LOOT_TYPES, GEM_HUES, SEASONS, MAX_SPEED,
-    seasonOf, seasonAt, nextSeason, itemWindow, nextItemWindow, SEASON_DATES, PREVIEW_MS, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
+    seasonOf, seasonAt, nextSeason, itemWindow, nextItemWindow, seaWindow, SEASON_DATES, PREVIEW_MS, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
 })(typeof globalThis !== "undefined" ? globalThis : this);
