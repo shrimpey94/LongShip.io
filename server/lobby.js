@@ -9,7 +9,7 @@ import "../games/longship/sim.js";
 import { SKINS as STORE_SKINS, verifyIdToken, googleKeys, firestore } from "./store.js";
 // Premium skins (bought in the Gold Runes store) are only shown to other players once the server has checked
 // the player's wallet. Until then (or if they don't own it) everyone sees the starter skin instead.
-const PREMIUM = new Set(STORE_SKINS.map(s => s.id));
+const PREMIUM = new Set([...STORE_SKINS.map(s => s.id), "warband"]);   // + the recruit-10-Vikings reward skin
 const Sim = globalThis.LongshipSim;
 
 const MAX_PLAYERS = 20;   // real players per lobby (raise this when lobbies get busy)

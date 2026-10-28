@@ -74,7 +74,7 @@ export const publicCatalog = (env = {}) => ({
 });
 
 /* ---------------- small helpers ---------------- */
-const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+export const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const enc = new TextEncoder();
 const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const b64urlText = s => b64url(enc.encode(s));
@@ -124,11 +124,11 @@ async function pemKey(pem) {
   const der = Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "")), c => c.charCodeAt(0));
   return crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
 }
-async function googleToken(env, fetcher) {
+export async function googleToken(env, fetcher) {
   if (gtok.token && Date.now() < gtok.until) return gtok.token;
   const sa = JSON.parse(env.FIREBASE_SA), now = Math.floor(Date.now() / 1000);
   const unsigned = b64urlText(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
-    b64urlText(JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/datastore", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
+    b64urlText(JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/identitytoolkit", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
   const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", await pemKey(sa.private_key), enc.encode(unsigned));
   const r = await fetcher("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
     body: "grant_type=" + encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer") + "&assertion=" + unsigned + "." + b64url(sig) });
@@ -138,9 +138,9 @@ async function googleToken(env, fetcher) {
 }
 const DOCS = `projects/${PROJECT}/databases/(default)/documents`;
 const FS = "https://firestore.googleapis.com/v1/";
-const val = v => typeof v === "number" ? { integerValue: String(Math.trunc(v)) } : typeof v === "boolean" ? { booleanValue: v }
+export const val = v => typeof v === "number" ? { integerValue: String(Math.trunc(v)) } : typeof v === "boolean" ? { booleanValue: v }
   : Array.isArray(v) ? { arrayValue: { values: v.map(val) } } : v === null ? { nullValue: null } : { stringValue: String(v) };
-const fields = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, val(v)]));
+export const fields = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, val(v)]));
 const plain = f => { if (!f) return null; if ("integerValue" in f) return +f.integerValue; if ("stringValue" in f) return f.stringValue; if ("booleanValue" in f) return f.booleanValue;
   if ("arrayValue" in f) return (f.arrayValue.values || []).map(plain); if ("timestampValue" in f) return f.timestampValue; return null; };
 
@@ -165,7 +165,7 @@ export function firestore(env, fetcher = fetch) {
   };
 }
 // A wallet change that also creates the wallet if it doesn't exist yet, without touching its other fields.
-const walletChange = (db, uid, { runes = 0, add = null, remove = null }, pre) => ({
+export const walletChange = (db, uid, { runes = 0, add = null, remove = null }, pre) => ({
   update: { name: db.name("wallets/" + uid), fields: {} }, updateMask: { fieldPaths: [] },
   updateTransforms: [
     ...(runes ? [{ fieldPath: "runes", increment: val(runes) }] : []),

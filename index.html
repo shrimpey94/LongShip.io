@@ -127,6 +127,21 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 .skin .bonus{position:absolute;top:8px;left:8px;background:#2e8b3a;border-radius:999px;padding:2px 8px;font:800 11px system-ui}
 .skin.prem{border-color:#d4af3766;background:linear-gradient(#0b2a3c,#1a1630)}
 #storeHead{width:100%;max-width:760px;text-align:center;margin-bottom:10px}
+#share{position:fixed;inset:0;z-index:31;background:#06192af2;display:flex;justify-content:center;align-items:flex-start;overflow:auto;padding:18px 12px 30px}
+#share .box{width:100%;max-width:520px}
+#share .top{display:flex;align-items:center;gap:12px}
+#share h2{margin:0;font:900 24px system-ui;flex:1}
+#share .lbl{margin:14px 0 4px;font:700 12px system-ui;opacity:.7;text-transform:uppercase;letter-spacing:.05em}
+#sharePost{background:#0b2a3c;border:1px solid #ffffff22;border-radius:10px;padding:10px 12px;font:15px/1.4 system-ui;white-space:pre-wrap;word-break:break-word}
+#share .fb{display:block;width:100%;margin:14px 0 4px;padding:13px;border:0;border-radius:999px;background:#1877f2;color:#fff;font:800 16px system-ui;cursor:pointer}
+#share small{display:block;font-size:12px;opacity:.7;text-align:center}
+#share .nets{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
+#share .nets button{padding:10px;border-radius:10px;border:1px solid #ffffff22;background:#0b2a3c;color:var(--ink);font:700 14px system-ui;cursor:pointer}
+#share .nets button.mob{display:none}
+@media (pointer:coarse){#share .nets button.mob{display:block}}
+#shareRef{margin-top:12px;background:linear-gradient(#3a0d14,#1d0a10);border:1px solid #f2c94c55;border-radius:12px;padding:12px;font-size:14px;line-height:1.45}
+#shareRef .bar{height:8px;border-radius:99px;background:#ffffff1a;overflow:hidden;margin:8px 0 4px}
+#shareRef .bar i{display:block;height:100%;background:linear-gradient(90deg,#f2c94c,#ff8a65)}
 #storeHead .bal{font:900 22px system-ui;color:var(--gold)}
 #storeHead .test{display:inline-block;margin-top:6px;background:#7a4d00;border-radius:8px;padding:4px 10px;font:700 12px system-ui}
 #storeHead h3{margin:16px 0 6px;font:800 16px system-ui;text-align:left}
@@ -141,6 +156,18 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 <canvas id="mini" width="240" height="240"></canvas>
 <div id="toast"></div>
 <button id="recBtn" title="Record a vertical clip for TikTok / Shorts">● REC</button><div id="recHint">Shorts mode · 9:16 · press REC, play, press again to save (auto-stops at 59s). Records the game's music and sound effects too.</div>
+<div id="share" class="hidden"><div class="box">
+  <div class="top"><h2>📣 Share &amp; recruit</h2><button class="btn2" id="shareClose" style="margin:0">Done</button></div>
+  <div id="shareRef"></div>
+  <p class="lbl">Your post</p><div id="sharePost"></div>
+  <button class="fb" data-net="fb">Post to Facebook</button>
+  <small id="fbNote">Facebook doesn't let sites fill in the words for you, so we copy your post first: just paste it.</small>
+  <div class="nets">
+    <button data-net="x">𝕏 X / Twitter</button><button data-net="wa">WhatsApp</button><button data-net="msgr" class="mob">Messenger</button>
+    <button data-net="tg">Telegram</button><button data-net="rd">Reddit</button><button data-net="sms" class="mob">Text message</button>
+    <button data-net="mail">Email</button><button data-net="more" id="netMore">More…</button><button data-net="copy">🔗 Copy link</button>
+    <button data-net="card">🖼️ Save score card</button>
+  </div></div></div>
 <div id="ward" class="hidden"><div class="top"><h2>🎨 Wardrobe</h2><span>Plunder: <span class="plunder" data-plunder></span></span><button class="btn2" id="wardClose" style="margin:0">Done</button></div>
   <div class="tabs"><button data-tab="ships" class="on">⛵ Ship skins</button><button data-tab="figs">🐉 Figureheads</button><button data-tab="trails">✨ Trails</button><button data-tab="store" id="storeTab" class="hidden">ᚱ Store</button></div>
   <div id="storeHead" class="hidden"></div>
@@ -228,6 +255,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     { id: "odin",    name: "Odin",          a: "#24324d", b: "#d4af37", shape: "kite",   pat: "cross",  hull: ["#070b14", "#24324d", "#d4af37"], sail: ["#1b2438", "#d4af37"], sailPat: "border",  emb: "raven",    embC: "#d4af37", wake: "feather", glow: "#d4af37", fx: "ravens", premium: true, un: { t: "premium" } },
     { id: "thor",    name: "Thor",          a: "#8e9bb0", b: "#1c3f8a", shape: "round",  pat: "bolt",   hull: ["#0a1020", "#33415c", "#bfe9ff"], sail: ["#1c3f8a", "#e8eef7"], sailPat: "hstripe", emb: "bolt",     embC: "#bfe9ff", wake: "spark",   glow: "#7fd3ff", fx: "lightning", premium: true, un: { t: "premium" } },
     { id: "loki",    name: "Loki",          a: "#1f7a34", b: "#c9a227", shape: "kite",   pat: "split",  hull: ["#06130a", "#1d3b22", "#c9a227"], sail: ["#123d1c", "#c9a227"], sailPat: "diag",    emb: "horns",    embC: "#c9a227", wake: "venom",   glow: "#7dff5c", fx: "shift", premium: true, un: { t: "premium" } },
+    // ⚔️ recruiter reward: only for players who bring in 10 new Vikings (can't be bought; granted by the server)
+    { id: "warband", name: "Warband Chief", a: "#8e0e1c", b: "#f2c94c", shape: "kite", pat: "cross", hull: ["#1a0508", "#5a1018", "#f2c94c"], sail: ["#8e0e1c", "#f2c94c"], sailPat: "border", emb: "crown", embC: "#f2c94c", wake: "gold", glow: "#ffb347", fx: "banners", refReward: true, un: { t: "ref", label: "Recruit 10 Vikings 📣" } },
     // 🎃 Halloween (earnable only Oct 1 – Nov 2)
     { id: "ghost",   name: "Ghost Ship",    a: "#c8f7dc", b: "#7ee8b0", shape: "round",  pat: "rings",  hull: ["#123128", "#3f6e62", "#9cffc8"], sail: ["#e8fff2", "#7ee8b0"], sailPat: "torn",    emb: "wisp",     embC: "#3fbf86", wake: "mist", glow: "#9cffc8", ghostly: true, season: "halloween", un: { t: "ach", key: "h_dutch", label: "Sink the Flying Dutchman" } },
     { id: "bone",    name: "Bone Raft",     a: "#efe9da", b: "#232323", shape: "square", pat: "skull",  hull: ["#2a2620", "#bdb39b", "#f4efe2"], sail: ["#1a1a1a", "#efe9da"], sailPat: "torn",    emb: "skull",    embC: "#efe9da", wake: "ash",     season: "halloween", un: { t: "ach", key: "h_treats", label: "Gather 150 treats in one voyage" } },
@@ -326,7 +355,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   const saveProf = () => { prof.t = Date.now(); store.set("ls_profile", JSON.stringify(prof)); cloudSave(); };
   // Gold Runes wallet: filled from the server (/api/store/wallet) after sign-in. Premium skins count as owned only if it lists them.
   const wallet = { runes: 0, owned: [], ok: false };
-  const unlocked = it => it.un.t === "premium" ? wallet.owned.includes(it.id)
+  const unlocked = it => it.un.t === "premium" || it.un.t === "ref" ? wallet.owned.includes(it.id)
     : it.un.t === "free" || prof.owned.includes(it.id) || wallet.owned.includes(it.id) || (it.un.t === "ach" && prof.ach[it.un.key]);
   function achieve(key) {
     if (prof.ach[key]) return; prof.ach[key] = true; saveProf();
@@ -452,6 +481,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   function onPlayerSunk(r) {   // r: { by, how, peak, kills }
     const s = player; if (s) { s.alive = false; s.kills = r.kills; s.peak = r.peak; }
     sfx.sunk(); sfx.boost(false); lastRun = { score: r.peak, kills: r.kills, skin: s.skin, fig: s.fig, trail: s.trail };
+    if (store.get(REF_KEY)) claimInvite();   // came through a friend's invite link: this finished voyage makes it count
     running = false; const best = Math.max(+store.get("ls_best") || 0, r.peak); store.set("ls_best", best);
     const earned = r.peak + r.kills * 25; prof.plunder += earned; prof.stats.runs++; if (prof.stats.runs >= 10) achieve("runs10");
     if (TH) { prof.stats[TH.runsKey] = (prof.stats[TH.runsKey] || 0) + 1; if (prof.stats[TH.runsKey] >= 3) achieve(TH.runsAch); } saveProf(); showPlunder();
@@ -1151,6 +1181,12 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
         for (let j = 1; j <= 4; j++) { const t = j / 4, jit = j < 4 ? (Math.sin(seed * 3.1 + j * 7 + b) * r * .9) : 0; c.lineTo(A.x + (B.x - A.x) * t + jit, A.y + (B.y - A.y) * t - jit); }
         c.stroke(); c.globalAlpha = ga * .5; c.drawImage(haloSprite("#7fd3ff"), A.x - r * 2, A.y - r * 2, r * 4, r * 4); }
       c.globalAlpha = ga;
+    } else if (sk.fx === "banners") {   // war banners fly along the shield wall
+      for (let i = 3; i < segs.length; i += 6) { const p = segs[i]; if (!vis(p.x, p.y, r * 4)) continue;
+        const h = r * 2.2, w = r * 1.5, wave = Math.sin(T * .2 + i) * r * .25;
+        c.strokeStyle = "#3a2410"; c.lineWidth = Math.max(1.2, r * .12); c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x, p.y - h); c.stroke();
+        c.fillStyle = "#8e0e1c"; c.strokeStyle = "#f2c94c"; c.lineWidth = Math.max(1, r * .08); c.beginPath(); c.moveTo(p.x, p.y - h);
+        c.quadraticCurveTo(p.x + w * .5, p.y - h + wave, p.x + w, p.y - h + r * .35 + wave); c.lineTo(p.x, p.y - h + r * .75); c.closePath(); c.fill(); c.stroke(); }
     } else if (sk.fx === "shift") {   // Loki's glow keeps changing color down the hull
       const R = r * 1.9;
       for (let i = 1; i < segs.length; i += 2) { const p = segs[i]; if (!vis(p.x, p.y, R)) continue;
@@ -1472,7 +1508,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
           if (acct.admin && lb.unsub) watchBoard(); try { const d = await db.collection("users").doc(u.uid).get(); mergeCloud(d.exists ? d.data() : null); } catch (e) {}
           store.set("ls_profile", JSON.stringify(prof)); cloudSave(); showPlunder(); if (!$("ward").classList.contains("hidden")) renderWard();
           if (!$("name").value && u.displayName) $("name").value = u.displayName.split(" ")[0].slice(0, 14); }
-        acct.tok = u ? await u.getIdToken().catch(() => null) : null;
+        acct.tok = u ? await u.getIdToken().catch(() => null) : null; ref.me = null;
+        if (!$("share").classList.contains("hidden")) openShare();
         await loadWallet(); if (u) { loadCatalog(); afterCheckout(); }
         if (!$("ward").classList.contains("hidden")) renderWard();
         paintAcct();
@@ -1504,18 +1541,69 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     x.font = "600 36px system-ui,sans-serif"; x.fillStyle = "#f3ead6"; x.fillText("busterrdust.com/games", S / 2, S * .9 + 52);
     return c;
   }
-  async function shareScore() {
-    if (!lastRun) return; sfx.click();
-    const text = `I built a ${lastRun.score}-shield wall in Longship.io${lastRun.kills ? ` and sank ${lastRun.kills} raider${lastRun.kills > 1 ? "s" : ""}` : ""}! Can you beat me? ⛵`;
-    const blob = await new Promise(ok => scoreCard(lastRun).toBlob(ok, "image/png"));
-    const file = blob && new File([blob], "longship-score.png", { type: "image/png" });
-    try {
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: text + " " + GAME_URL, title: "Longship.io" }); return; }
-      if (navigator.share) { await navigator.share({ text, url: GAME_URL, title: "Longship.io" }); return; }
-    } catch (e) { if (e && e.name === "AbortError") return; }
-    try { await navigator.clipboard.writeText(text + " " + GAME_URL); toast("🔗 Link copied!", "Your score card is downloading too"); } catch (e) { toast("📸 Score card saved", GAME_URL); }
-    if (blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "longship-score.png"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); }
+  /* ===================== share & recruit =====================
+     Your link carries your invite code (?ref=XXXXXX). A friend who opens it, signs in as a NEW player and finishes a
+     voyage counts as your recruit: +10 Gold Runes each, and the Warband Chief skin at 10 (server/referrals.js). */
+  const REF_KEY = "ls_ref";
+  (() => { const c = (QS.get("ref") || "").toUpperCase();   // arrived through someone's invite link: remember it
+    if (/^[A-Z2-9]{6}$/.test(c) && !store.get(REF_KEY)) store.set(REF_KEY, c);
+    if (QS.has("ref")) { QS.delete("ref"); history.replaceState(null, "", location.pathname + (QS.toString() ? "?" + QS : "")); } })();
+  const ref = { me: null };
+  async function refApi(path, body) {
+    const r = await fetch("/api/ref/" + path, { method: body ? "POST" : "GET", headers: Object.assign({ authorization: "Bearer " + await acct.user.getIdToken() }, body ? { "content-type": "application/json" } : {}), body: body && JSON.stringify(body) });
+    const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || "Try again"), { final: d.final }); return d;
   }
+  async function claimInvite() {   // after a finished voyage, while signed in
+    const code = store.get(REF_KEY); if (!code || !acct.user) return;
+    try { await refApi("claim", { code }); store.set(REF_KEY, ""); toast("⚔️ Welcome aboard!", "The Viking who invited you just got 10 Gold Runes"); }
+    catch (e) { if (e.final) store.set(REF_KEY, ""); }   // not a new player, own code, etc.: forget it. Network trouble: try next voyage
+  }
+  const myLink = () => GAME_URL + (ref.me ? "?ref=" + ref.me.code : "");
+  const postText = () => lastRun
+    ? `I built a ${lastRun.score}-shield wall in Longship.io${lastRun.kills ? ` and sank ${lastRun.kills} raider${lastRun.kills > 1 ? "s" : ""}` : ""}! ⛵ Can you beat me? Free in your browser, no download:`
+    : "Come raid with me in Longship.io ⛵ a free Viking .io game, right in your browser:";
+  function paintShare() {
+    const t = postText(), link = myLink();
+    $("sharePost").textContent = t + "\n" + link;
+    const r = ref.me, el = $("shareRef");
+    if (!acct.user) el.innerHTML = IN_APP ? `⚔️ Recruit friends for <b>+10 Gold Runes</b> each. To sign in, tap <b>•••</b> and choose <b>Open in browser</b>.`
+      : `⚔️ Sign in to get your own invite link: <b>+10 Gold Runes</b> for every new Viking you recruit, and the exclusive <b>Warband Chief</b> skin at 10.<br><button class="btn2" id="refSignIn" style="margin-top:8px">🔐 Sign in</button>`;
+    else if (!r) el.innerHTML = `⚔️ Getting your invite link…`;
+    else el.innerHTML = r.rewardOwned ? `⚔️ <b>${r.recruits}</b> Vikings recruited · you earned the <b>Warband Chief</b> skin! Still <b>+${r.perRecruit} Gold Runes</b> per recruit.`
+      : `⚔️ Recruits: <b>${r.recruits} / ${r.goal}</b> · <b>+${r.perRecruit} Gold Runes</b> each<div class="bar"><i style="width:${Math.min(100, r.recruits / r.goal * 100)}%"></i></div>
+        At ${r.goal}: the <b>Warband Chief</b> skin, only for recruiters. A recruit counts when a new player opens your link, signs in and finishes a voyage.`;
+    const si = $("refSignIn"); if (si) si.onclick = signIn;
+    $("netMore").style.display = navigator.share ? "" : "none";
+  }
+  async function openShare() {
+    sfx.click(); $("share").classList.remove("hidden"); paintShare();
+    if (acct.user && !ref.me) { try { ref.me = await refApi("me"); } catch (e) {} paintShare(); }
+  }
+  async function copyText(t) { try { await navigator.clipboard.writeText(t); return true; } catch (e) { return false; } }
+  async function shareTo(net) {
+    const t = postText(), link = myLink(), full = t + " " + link, E = encodeURIComponent;
+    const go = url => window.open(url, "_blank", "noopener");
+    if (net === "fb") { const ok = await copyText(full); toast(ok ? "📋 Post copied!" : "Facebook is opening", ok ? "Paste it into your Facebook post" : "Add a few words about your run");
+      return go("https://www.facebook.com/sharer/sharer.php?u=" + E(link)); }
+    if (net === "x") return go("https://twitter.com/intent/tweet?text=" + E(t) + "&url=" + E(link));
+    if (net === "wa") return go("https://wa.me/?text=" + E(full));
+    if (net === "msgr") return (location.href = "fb-messenger://share/?link=" + E(link));
+    if (net === "tg") return go("https://t.me/share/url?url=" + E(link) + "&text=" + E(t));
+    if (net === "rd") return go("https://www.reddit.com/submit?url=" + E(link) + "&title=" + E(t));
+    if (net === "sms") return (location.href = "sms:?&body=" + E(full));
+    if (net === "mail") return (location.href = "mailto:?subject=" + E("Raid with me in Longship.io") + "&body=" + E(full));
+    if (net === "copy") { const ok = await copyText(full); return toast(ok ? "🔗 Copied!" : "Copy didn't work", ok ? "Paste it anywhere" : link); }
+    const blob = lastRun ? await new Promise(ok => scoreCard(lastRun).toBlob(ok, "image/png")) : null;
+    const file = blob && new File([blob], "longship-score.png", { type: "image/png" });
+    if (net === "more") { try {
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ files: [file], text: full, title: "Longship.io" });
+        return await navigator.share({ text: t, url: link, title: "Longship.io" }); } catch (e) { return; } }
+    if (net === "card") { if (!blob) return toast("Sail a voyage first", "Then you'll have a score card");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "longship-score.png"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); }
+  }
+  document.querySelectorAll("#share [data-net]").forEach(b => b.onclick = () => shareTo(b.dataset.net));
+  $("shareClose").onclick = () => $("share").classList.add("hidden");
+  const shareScore = openShare;
   $("shareBtn").onclick = shareScore;
 
   let last = performance.now();
@@ -1593,7 +1681,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
       // feats from a season whose sea hasn't started yet (e.g. Yule items on sale Nov 3, Krampus arrives Nov 20): buy now with Runes, or wait and earn
       const sea = it.un.t === "ach" && it.season && window.LongshipSim.seaWindow(it.season, now), earnLater = sea && sea.start > now ? new Date(sea.start + 1).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null;
       const how = (it.season ? SEASON_LABEL[it.season] + " · " : "") + (it.un.t === "free" ? "Starter" : it.un.t === "buy" ? `${it.un.cost.toLocaleString()} plunder` : it.premium ? `✨ Premium${cat ? ` · ${cat.runes.toLocaleString()} Runes` : ""}` : it.un.label + (earnLater ? ` (from ${earnLater})` : ""));
-      const btn = soon ? `<button disabled>Coming soon</button>` : eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` : it.premium ? `<button data-gostore="1">ᚱ In the Store</button>` :
+      const btn = soon ? `<button disabled>Coming soon</button>` : eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` : it.premium ? `<button data-gostore="1">ᚱ In the Store</button>` : it.un.t === "ref" ? `<button data-recruit="1">📣 Recruit Vikings</button>` :
         (it.un.t === "buy" ? `<button data-buy="${it.id}" ${prof.plunder < it.un.cost ? "disabled" : ""}>Buy · ${it.un.cost.toLocaleString()}</button>` : `<button disabled>🔒 ${earnLater ? "Earn from " + earnLater : "Feat"}</button>`) + rbtn;
       return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"} ${soon ? "soon" : ""}" data-card="${it.id}">${un ? "" : `<span class="tag">${soon ? "🔜" : "🔒"}</span>`}${clock}<canvas width="520" height="220" data-pv="${it.id}"></canvas>
         <b>${it.name}</b>${wtab === "ships" ? `<em class="wk">${WAKE_NAME[it.wake] || ""} trail</em>` : wtab === "figs" && FIG_FX[it.id] ? `<em class="wk">✨ ${WAKE_NAME[FIG_FX[it.id][0]]}</em>` : wtab === "trails" ? `<em class="wk">${it.id === "skin" ? "Matches your skin" : it.aura ? "+ shield glow" : "No glow"}</em>` : ""}<small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
@@ -1680,6 +1768,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     if (rbuy) return storeAction(async () => { const d = await storeApi("buy", { item: rbuy.dataset.rbuy }); wallet.runes = d.runes; wallet.owned = d.owned;
       prof.eq[rbuy.dataset.slot2 || "skin"] = rbuy.dataset.rbuy; saveProf(); sfx.buy(); toast("✨ Unlocked!", "It's equipped"); }, wtab !== "store");
     if (gostore) { document.querySelector('#ward [data-tab="store"]').click(); return; }
+    if (e.target.closest("[data-recruit]")) { openShare(); return; }
     const eqs = e.target.closest("[data-slot]"); if (eqs) { prof.eq[eqs.dataset.slot] = eqs.dataset.eq; saveProf(); sfx.click(); renderStore(); return; }
     const eq = e.target.closest("[data-eq]"), buy = e.target.closest("[data-buy]");
     if (eq) { prof.eq[SLOT[wtab]] = eq.dataset.eq; saveProf(); renderWard(); sfx.click(); }
