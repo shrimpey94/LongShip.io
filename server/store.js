@@ -215,7 +215,7 @@ export async function handleStore(request, env, deps = {}) {
           product_data: { name: it.kind === "pack" ? `${it.name} · ${it.runes.toLocaleString("en-US")} Gold Runes` : `${it.name} skin (Longship.io)` } } } },
         metadata: { uid: me.uid, item: it.id },
         payment_intent_data: { metadata: { uid: me.uid, item: it.id } },
-        custom_text: { submit: { message: "Gold Runes and skins are cosmetic, delivered instantly to your Longship.io account, and all sales are final." } },
+        // (no custom_text: Stripe Managed Payments, on by default for this account, doesn't allow it. The store screen shows the terms.)
       });
       return json({ url: s.url });
     }
