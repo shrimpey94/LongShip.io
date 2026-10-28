@@ -1523,8 +1523,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   /* ===================== Gold Runes store =====================
      Prices, Runes and premium ownership all come from the server (server/store.js). This page only shows them
      and sends the player to Stripe's own checkout page. While testing, only admin accounts can see the store. */
-  const storeVisible = () => acct.admin;
-  const shop = { cat: null, busy: false };
+  const shop = { cat: null, busy: false, agree: false };
+  const storeVisible = () => acct.admin || !!(shop.cat && shop.cat.public);   // public once STORE_PUBLIC=1 on the server
   const catalogSkin = id => shop.cat && shop.cat.skins.find(s => s.id === id);
   const money = c => "$" + (c / 100).toFixed(2);
   const RUNE_BAR = `<svg class="runebar" viewBox="0 0 84 46" aria-hidden="true"><path d="M10 34 L18 10 L70 8 L76 32 L66 40 L14 41 Z" fill="#b8860b"/><path d="M18 10 L70 8 L64 16 L24 17 Z" fill="#f2c94c"/><path d="M24 17 L64 16 L66 40 L14 41 Z" fill="#d4a017"/><path d="M38 21 L38 36 M38 21 L46 25 L38 29 L47 36" stroke="#6b4a00" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 20 l2 1 M55 33 l3-1 M60 21 l1 2" stroke="#fff3b0" stroke-width="1.5" opacity=".7"/></svg>`;
@@ -1546,9 +1546,13 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     if (!acct.user) { head.innerHTML = `<p>Sign in on the title screen to use the store.</p>`; $("wardGrid").innerHTML = ""; return; }
     const cat = await loadCatalog();
     if (!cat) { head.innerHTML = `<p>The store couldn't load. Try again in a moment.</p>`; $("wardGrid").innerHTML = ""; return; }
-    head.innerHTML = `<div class="bal">ᚱ ${wallet.runes.toLocaleString()} Gold Runes</div>${wallet.ok ? "" : `<div class="test">The store isn't open yet (no payment keys on the server).</div>`}
-      <div class="test">🧪 Test mode: only admins can see this. Pay with card 4242 4242 4242 4242, any future date, any CVC.</div>
-      <p style="font-size:12px;opacity:.75;margin:8px 0 0">Gold Runes and skins are cosmetic only. They never change how your ship sails. All sales are final.</p>`;
+    head.innerHTML = `<div class="bal">ᚱ ${wallet.runes.toLocaleString()} Gold Runes</div>${wallet.ok ? "" : `<div class="test">The store isn't open right now. Try again later.</div>`}
+      ${cat.mode === "test" ? `<div class="test">🧪 Test mode${cat.public ? "" : " · only admins can see this"}. Pay with card 4242 4242 4242 4242, any future date, any CVC.</div>` : !cat.public ? `<div class="test">💳 LIVE payments · only admins can see the store</div>` : ""}
+      <p style="font-size:12px;opacity:.75;margin:8px 0 0">Gold Runes and skins are cosmetic only. They never change how your ship sails.</p>
+      <label id="agreeRow" style="display:flex;gap:8px;align-items:flex-start;justify-content:center;text-align:left;font-size:13px;margin:10px auto 0;max-width:560px;cursor:pointer">
+        <input type="checkbox" id="storeAgree" ${shop.agree ? "checked" : ""} style="margin-top:3px;width:18px;height:18px;flex:none">
+        <span>I agree to the <a href="terms.html" target="_blank" rel="noopener" style="color:var(--gold)">Terms of Sale</a>: all sales are final, my items are delivered right away, and I give up any right to cancel once they are. Under 18? Ask a parent first.</span></label>`;
+    $("storeAgree").onchange = e => { shop.agree = e.target.checked; };
     const packs = cat.packs.map(p => `<div class="skin">${p.bonus ? `<span class="bonus">${p.bonus}</span>` : ""}${RUNE_BAR}<b>${p.runes.toLocaleString()} Runes</b><small>${p.name}</small>
       <button class="pay" data-pay="${p.id}">Buy · ${money(p.cents)}</button></div>`).join("");
     const skins = cat.skins.map(s => { const own = wallet.owned.includes(s.id), sk = SKINS.find(k => k.id === s.id);
@@ -1574,6 +1578,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 
   $("wardGrid").addEventListener("click", e => {
     const pay = e.target.closest("[data-pay]"), rbuy = e.target.closest("[data-rbuy]"), gostore = e.target.closest("[data-gostore]");
+    if ((pay || rbuy) && !shop.agree) { toast("☑️ Tick the Terms of Sale box first", "It's just above the store"); $("agreeRow").scrollIntoView({ block: "center", behavior: "smooth" }); return; }
     if (pay) return storeAction(async () => { const { url } = await storeApi("checkout", { item: pay.dataset.pay }); location.href = url; });
     if (rbuy) return storeAction(async () => { const d = await storeApi("buy", { item: rbuy.dataset.rbuy }); wallet.runes = d.runes; wallet.owned = d.owned;
       prof.eq.skin = rbuy.dataset.rbuy; saveProf(); sfx.buy(); toast("✨ Unlocked!", "It's equipped"); });
@@ -1588,7 +1593,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     document.querySelectorAll("#ward [data-tab]").forEach(x => x.classList.toggle("on", x === b)); renderWard(); });
   const openWard = () => { $("ward").classList.remove("hidden"); renderWard(); };
   $("wardBtn").onclick = openWard; $("wardBtn2").onclick = openWard; $("wardClose").onclick = () => { $("ward").classList.add("hidden"); showPlunder(); };
-  showPlunder(); initAcct();
+  showPlunder(); initAcct(); loadCatalog().then(() => { if (!$("ward").classList.contains("hidden")) renderWard(); });
   $("lbBtn").onclick = () => { const el = $("startLb"), open = el.classList.toggle("hidden") === false; if (open) watchBoard(); else stopBoard(); };
   $("name").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
   if (location.hash === "#scores") $("lbBtn").click();   // "High scores" link from the games page opens the board

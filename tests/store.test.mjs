@@ -40,6 +40,7 @@ function memDb() {
         const nd = mask ? { ...data, ...Object.fromEntries(mask.map(k => [k, flds[k]])) } : flds;
         for (const t of w.updateTransforms || []) {
           if (t.increment) nd[t.fieldPath] = (nd[t.fieldPath] || 0) + val(t.increment);
+          if (t.removeAllFromArray) { const rm = t.removeAllFromArray.values.map(val); nd[t.fieldPath] = (nd[t.fieldPath] || []).filter(x => !rm.includes(x)); }
           if (t.appendMissingElements) { const a = nd[t.fieldPath] || []; for (const v of t.appendMissingElements.values.map(val)) if (!a.includes(v)) a.push(v); nd[t.fieldPath] = a; }
         }
         next.set(p, { data: nd, t: "t" + (++clock) });
@@ -51,10 +52,11 @@ function memDb() {
 
 /* ---- fake Stripe ---- */
 const stripeCalls = [];
+const PI_META = { pi_cs_1: { uid: "alice", item: "runes_300" }, pi_cs_4: { uid: "bob", item: "thor" } };
 const fakeFetch = async (url, init = {}) => {
   stripeCalls.push({ url, body: init.body || "" });
   if (url.includes("checkout/sessions")) return new Response(JSON.stringify({ id: "cs_test_1", url: "https://checkout.stripe.com/pay/cs_test_1" }), { status: 200 });
-  if (url.includes("payment_intents/")) return new Response(JSON.stringify({ metadata: { uid: "alice" } }), { status: 200 });
+  if (url.includes("payment_intents/")) { const id = url.split("payment_intents/")[1]; const m = PI_META[id] || { uid: "alice" }; return new Response(JSON.stringify({ metadata: m }), { status: 200 }); }
   return new Response("{}", { status: 404 });
 };
 
@@ -149,10 +151,24 @@ const thor = await signed(paid("cs_4", "bob", "thor", 2999));
 r = await call("webhook", { body: thor.raw, headers: { "stripe-signature": thor.header } });
 ok(wallet("bob").owned.join() === "thor" && !wallet("bob").runes, "direct skin purchase adds the skin, no Runes");
 
-// chargeback flags the account
+// refunds and chargebacks take the items back, once
+r = await call("catalog", { method: "GET" });
+ok(r.body.public === false && r.body.mode === "test", "catalog says test mode and not public by default");
+const before = wallet("alice").runes;
+let refund = await signed({ type: "charge.refunded", data: { object: { id: "ch_1", payment_intent: "pi_cs_1", refunded: true, amount: 299 } } });
+r = await call("webhook", { body: refund.raw, headers: { "stripe-signature": refund.header } });
+ok(r.body.reversed === true && wallet("alice").runes === before - 300, "full refund takes the 300 Runes back");
+r = await call("webhook", { body: refund.raw, headers: { "stripe-signature": refund.header } });
+ok(wallet("alice").runes === before - 300, "the same refund again takes nothing more");
 const disp = await signed({ type: "charge.dispute.created", data: { object: { id: "dp_1", payment_intent: "pi_cs_1", amount: 299, reason: "fraudulent" } } });
 r = await call("webhook", { body: disp.raw, headers: { "stripe-signature": disp.header } });
-ok(r.status === 200 && db.docs.get("disputes/dp_1") && wallet("alice").flagged === true && wallet("alice").runes === 250, "chargeback is recorded and the account flagged (Runes untouched)");
+ok(db.docs.get("disputes/dp_1") && wallet("alice").flagged === true && wallet("alice").runes === before - 300, "chargeback after a refund is recorded + flagged, but nothing is taken twice");
+const partial = await signed({ type: "charge.refunded", data: { object: { id: "ch_4", payment_intent: "pi_cs_4", refunded: false, amount_refunded: 100 } } });
+r = await call("webhook", { body: partial.raw, headers: { "stripe-signature": partial.header } });
+ok(wallet("bob").owned.join() === "thor", "partial refund changes nothing");
+const disp2 = await signed({ type: "charge.dispute.created", data: { object: { id: "dp_2", payment_intent: "pi_cs_4", amount: 2999, reason: "fraudulent" } } });
+r = await call("webhook", { body: disp2.raw, headers: { "stripe-signature": disp2.header } });
+ok(wallet("bob").owned.length === 0 && wallet("bob").flagged === true, "chargeback on a skin purchase removes the skin and flags the account");
 
 // other players can't see or spend someone else's wallet
 r = await call("wallet", { method: "GET", uid: "mallory" });

@@ -49,7 +49,9 @@ export function findItem(id) {
   const s = SKINS.find(x => x.id === id); if (s) return { kind: "skin", ...s };
   return null;
 }
-export const publicCatalog = () => ({
+export const publicCatalog = (env = {}) => ({
+  public: env.STORE_PUBLIC === "1",                                   // everyone sees the store (else admins only)
+  mode: (env.STRIPE_SECRET_KEY || "").startsWith("sk_live_") ? "live" : "test",
   packs: PACKS,
   skins: SKINS.filter(s => onSale(s)).map(({ id, name, tier, blurb, runes, cents, to }) => ({ id, name, tier, blurb, runes, cents, to: to || null })),
 });
@@ -146,11 +148,12 @@ export function firestore(env, fetcher = fetch) {
   };
 }
 // A wallet change that also creates the wallet if it doesn't exist yet, without touching its other fields.
-const walletChange = (db, uid, { runes = 0, add = null }, pre) => ({
+const walletChange = (db, uid, { runes = 0, add = null, remove = null }, pre) => ({
   update: { name: db.name("wallets/" + uid), fields: {} }, updateMask: { fieldPaths: [] },
   updateTransforms: [
     ...(runes ? [{ fieldPath: "runes", increment: val(runes) }] : []),
     ...(add ? [{ fieldPath: "owned", appendMissingElements: { values: [val(add)] } }] : []),
+    ...(remove ? [{ fieldPath: "owned", removeAllFromArray: { values: [val(remove)] } }] : []),
   ],
   ...(pre ? { currentDocument: pre } : {}),
 });
@@ -181,7 +184,7 @@ export async function handleStore(request, env, deps = {}) {
   const fetcher = deps.fetch || fetch;
   const path = new URL(request.url).pathname.replace(/^\/api\/store\/?/, "");
   try {
-    if (path === "catalog") return json(publicCatalog());
+    if (path === "catalog") return json(publicCatalog(env));
 
     const closed = storeOpen(env);
     if (closed) return json({ error: closed }, 503);
@@ -266,14 +269,27 @@ async function webhook(request, env, db, fetcher) {
     return json({ ok: true, credited: res === "ok" });   // "conflict" = this payment was already credited (Stripe retried)
   }
 
-  if (ev.type === "charge.dispute.created") {
-    let uid = "";
-    try { if (o.payment_intent) uid = ((await stripe(env, fetcher, "GET", "payment_intents/" + o.payment_intent)).metadata || {}).uid || ""; } catch (e) {}
-    await db.commit([
-      { update: { name: db.name("disputes/" + o.id), fields: fields({ uid, pi: o.payment_intent || "", cents: o.amount || 0, reason: o.reason || "", at: new Date().toISOString() }) } },
-      ...(uid ? [{ update: { name: db.name("wallets/" + uid), fields: fields({ flagged: true }) }, updateMask: { fieldPaths: ["flagged"] } }] : []),
-    ]);
-    return json({ ok: true });
+  // No refunds from Busterrdust. But if Stripe (Managed Payments) refunds a payment in full, or the buyer's bank
+  // starts a chargeback, everything that payment bought is taken back: Runes come off (the balance can go below
+  // zero if they were already spent) and a bought skin is removed. Each payment is reversed at most once.
+  const fullRefund = ev.type === "charge.refunded" && o.refunded === true;
+  if (fullRefund || ev.type === "charge.dispute.created") {
+    const pi = o.payment_intent || "";
+    let meta = {};
+    try { if (pi) meta = (await stripe(env, fetcher, "GET", "payment_intents/" + pi)).metadata || {}; } catch (e) {}
+    const uid = meta.uid || "", it = findItem(meta.item);
+    const writes = [];
+    if (ev.type === "charge.dispute.created")
+      writes.push({ update: { name: db.name("disputes/" + o.id), fields: fields({ uid, pi, cents: o.amount || 0, reason: o.reason || "", at: new Date().toISOString() }) } });
+    if (uid && it && pi) {
+      writes.push({ update: { name: db.name("reversals/" + pi), fields: fields({ uid, item: it.id, why: fullRefund ? "refund" : "chargeback", at: new Date().toISOString() }) }, currentDocument: { exists: false } });
+      writes.push(walletChange(db, uid, it.kind === "pack" ? { runes: -it.runes } : { remove: it.id }));
+    }
+    if (uid && ev.type === "charge.dispute.created") writes.push({ update: { name: db.name("wallets/" + uid), fields: fields({ flagged: true }) }, updateMask: { fieldPaths: ["flagged"] } });
+    let res = writes.length ? await db.commit(writes) : "ok";
+    if (res === "conflict" && ev.type === "charge.dispute.created")   // already reversed by a refund: still record the dispute + flag, take nothing twice
+      res = await db.commit(writes.filter(w => /\/(disputes)\//.test(w.update.name) || (w.updateMask && w.updateMask.fieldPaths[0] === "flagged")));
+    return json({ ok: true, reversed: !!(uid && it) && res === "ok" });
   }
   return json({ ok: true, ignored: ev.type });
 }
