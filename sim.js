@@ -36,13 +36,26 @@
     christmas: { boss: { name: "😈 Krampus", len: 110, skin: "krampus", fig: "skull" },
       rogues: ["😈 Krampus's Imp", "❄️ Frost Thrall", "❄️ Ice Wraith", "😈 Coal Fiend"], rogueSkin: "krampus" },
   };
-  // Halloween: Oct 1 - Nov 2 · Christmas: Nov 20 - Jan 2
-  function seasonOf(d) {
-    const m = d.getMonth() + 1, day = d.getDate();
-    if (m === 10 || (m === 11 && day <= 2)) return "halloween";
-    if ((m === 11 && day >= 20) || m === 12 || (m === 1 && day <= 2)) return "christmas";
-    return null;
+  /* ---------- seasons: the ONE calendar the game, lobby and store all use ----------
+     start = first day, end = first day AFTER the season (so Halloween runs Oct 1 through Nov 2).
+     Days flip at midnight US Eastern (05:00 UTC). Change a date here and everything follows. */
+  const SEASON_DATES = {
+    halloween: { start: [10, 1],  end: [11, 3] },
+    christmas: { start: [11, 20], end: [1, 3] },
+  };
+  const PREVIEW_MS = 2 * 864e5;   // the next season's items show (greyed out) this long before it starts
+  const at = (y, md) => Date.UTC(y, md[0] - 1, md[1], 5);
+  function seasonWindows(t) {   // every season window touching the years around time t
+    const y = new Date(t).getUTCFullYear(), out = [];
+    for (const yy of [y - 1, y, y + 1]) for (const id in SEASON_DATES) {
+      const d = SEASON_DATES[id], start = at(yy, d.start), end = at(yy + (d.end[0] < d.start[0] ? 1 : 0), d.end);
+      out.push({ id, start, end });
+    }
+    return out.sort((a, b) => a.start - b.start);
   }
+  function seasonAt(t) { return seasonWindows(t).find(w => t >= w.start && t < w.end) || null; }
+  function nextSeason(t) { return seasonWindows(t).find(w => w.start > t) || null; }
+  function seasonOf(d) { const w = seasonAt(+d); return w ? w.id : null; }
   // looks the bots can wear (the browser owns the art for every id)
   const BOT_SKINS = { all: ["fjord", "glacier", "forest", "raven", "frost", "jarl", "aurora", "thunder", "kraken", "blood", "ember", "valhalla"],
     halloween: ["ghost", "bone", "pumpkin"], christmas: ["candycane", "frostbite", "ginger"] };
@@ -400,5 +413,5 @@
   };
 
   root.LongshipSim = { W, SPEED, BOOST, TURN, BASE_LEN, BOTS, GOLD_TARGET, POWER_TARGET, PSTEP, POWERS, LOOT, LOOT_TYPES, GEM_HUES, SEASONS, MAX_SPEED,
-    seasonOf, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
+    seasonOf, seasonAt, nextSeason, SEASON_DATES, PREVIEW_MS, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
 })(typeof globalThis !== "undefined" ? globalThis : this);

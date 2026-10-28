@@ -43,10 +43,26 @@ export const SKINS = [
   { id: "loki", name: "Loki",  tier: "mythic", blurb: "Your hull shifts color. Your victims burst into green flame." },
 ].map(s => ({ ...s, runes: TIERS[s.tier][0], cents: TIERS[s.tier][1] }));
 
+/* Every other cosmetic (ship skins, figureheads, trails) can ALSO be bought with Gold Runes, besides plunder or its feat.
+   [id, Runes, season?]. Generated from the game's item lists: plunder cost <=1,000 → 300 · <=4,000 → 700 · <=9,000 → 1,500 ·
+   more → 3,000 · feat-only items → 700. Seasonal ones can only be bought while their season is on (calendar in sim.js). */
+export const RUNE_ITEMS = Object.fromEntries([
+  ["raven",300], ["frost",300], ["jarl",700], ["aurora",700], ["thunder",700], ["kraken",700],
+  ["blood",700], ["ember",700], ["valhalla",700], ["ghost",700,"halloween"], ["bone",700,"halloween"], ["pumpkin",300,"halloween"],
+  ["candycane",300,"christmas"], ["frostbite",700,"christmas"], ["ginger",700,"christmas"], ["serpent",300], ["ravenh",300], ["bear",700],
+  ["skull",700], ["gdragon",700], ["ramh",700], ["firedrake",700], ["frostwyrm",700], ["krakenh",700],
+  ["ravens",700], ["phoenix",1500], ["fenrir",1500], ["sleipnir",1500], ["jorm",3000], ["valkyrie",3000],
+  ["sol",3000], ["jack",700,"halloween"], ["bat",300,"halloween"], ["wraith",300,"halloween"], ["reindeer",700,"christmas"], ["snowman",300,"christmas"],
+  ["yulestar",300,"christmas"], ["glitter",300], ["frostt",300], ["embert",300], ["feathert",700], ["inkt",700],
+  ["sparkt",700], ["auroratr",700], ["lightt",700], ["venomt",1500], ["bifrost",1500], ["valkt",3000],
+  ["mistt",300,"halloween"], ["pleavest",300,"halloween"], ["snowt",300,"christmas"], ["candyt",300,"christmas"],
+].map(([id, runes, season]) => [id, { id, runes, season: season || null }]));
+const seasonOn = (season, now = Date.now()) => { if (!season) return true; const S = globalThis.LongshipSim; const w = S && S.seasonAt(now); return !!(w && w.id === season); };
 const onSale = (it, now = Date.now()) => (!it.from || now >= Date.parse(it.from)) && (!it.to || now < Date.parse(it.to));
 export function findItem(id) {
   const p = PACKS.find(x => x.id === id); if (p) return { kind: "pack", ...p };
   const s = SKINS.find(x => x.id === id); if (s) return { kind: "skin", ...s };
+  const r = RUNE_ITEMS[id]; if (r) return { kind: "item", ...r };   // Runes only
   return null;
 }
 export const publicCatalog = (env = {}) => ({
@@ -54,6 +70,7 @@ export const publicCatalog = (env = {}) => ({
   mode: (env.STRIPE_SECRET_KEY || "").startsWith("sk_live_") ? "live" : "test",
   packs: PACKS,
   skins: SKINS.filter(s => onSale(s)).map(({ id, name, tier, blurb, runes, cents, to }) => ({ id, name, tier, blurb, runes, cents, to: to || null })),
+  items: Object.fromEntries(Object.values(RUNE_ITEMS).filter(r => seasonOn(r.season)).map(r => [r.id, r.runes])),
 });
 
 /* ---------------- small helpers ---------------- */
@@ -206,6 +223,7 @@ export async function handleStore(request, env, deps = {}) {
     if (!it) return json({ error: "That item doesn't exist." }, 400);
 
     if (path === "checkout") {
+      if (it.kind === "item") return json({ error: "That one is bought with Gold Runes." }, 400);
       if (it.kind === "skin") {
         if (!onSale(it)) return json({ error: "That skin isn't for sale right now." }, 409);
         const w = await db.get("wallets/" + me.uid);
@@ -228,12 +246,12 @@ export async function handleStore(request, env, deps = {}) {
     }
 
     if (path === "buy") {
-      if (it.kind !== "skin") return json({ error: "Rune packs are bought with money, not Runes." }, 400);
-      if (!onSale(it)) return json({ error: "That skin isn't for sale right now." }, 409);
+      if (it.kind === "pack") return json({ error: "Rune packs are bought with money, not Runes." }, 400);
+      if (!onSale(it) || !seasonOn(it.season)) return json({ error: "That isn't for sale right now." }, 409);
       for (let tries = 0; tries < 4; tries++) {
         const w = await db.get("wallets/" + me.uid);
         const runes = w.data.runes || 0, owned = w.data.owned || [];
-        if (owned.includes(it.id)) return json({ error: "You already own that skin.", runes, owned }, 409);
+        if (owned.includes(it.id)) return json({ error: "You already own that.", runes, owned }, 409);
         if (runes < it.runes) return json({ error: `You need ${(it.runes - runes).toLocaleString("en-US")} more Runes.`, runes, owned }, 402);
         const res = await db.commit([
           walletChange(db, me.uid, { runes: -it.runes, add: it.id }, w.exists ? { updateTime: w.updateTime } : { exists: false }),

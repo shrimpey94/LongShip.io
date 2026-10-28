@@ -111,6 +111,18 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 .skin.locked canvas{filter:saturate(.55) brightness(.75)}
 .skin button{margin-top:6px;width:100%;padding:7px;border-radius:999px;border:0;font:800 13px system-ui;cursor:pointer;background:var(--gold);color:#241604}
 .skin button.pay{background:#2b7bd6;color:#fff}
+.skin button.rune{background:#3a2c08;color:var(--gold);border:1px solid #e7b54a88}
+.skin button.rune:disabled{opacity:.45}
+.skin.soon{opacity:.55;filter:grayscale(.85)}
+.skin .cd{display:block;margin:-2px 0 6px;font:800 11.5px system-ui;color:#9fe3ff}
+.skin .cd.leave{color:#ff9f5a;animation:cdpulse 1.2s ease-in-out infinite}
+@keyframes cdpulse{50%{opacity:.55}}
+.skin.dissolve{animation:dissolve 1.3s ease-in forwards;pointer-events:none}
+@keyframes dissolve{0%{opacity:1;filter:none;transform:none}35%{filter:blur(1px) brightness(1.6) sepia(.6);opacity:.9}100%{opacity:0;filter:blur(10px) brightness(2.2);transform:translateY(-14px) scale(.9)}}
+.skin.dissolve::after{content:"";position:absolute;inset:0;border-radius:12px;background:radial-gradient(circle,#fff6 1px,transparent 2px) 0 0/9px 9px;animation:dust 1.3s linear forwards}
+@keyframes dust{to{transform:translateY(-30px);opacity:0}}
+.skin.arrive{animation:arrive 1.3s ease-out}
+@keyframes arrive{0%{filter:grayscale(1) brightness(.6)}50%{filter:grayscale(0) brightness(1.8);box-shadow:0 0 24px #9fe3ff}100%{filter:none}}
 .skin .runebar{display:block;margin:4px auto 0;width:84px;height:46px}
 .skin .bonus{position:absolute;top:8px;left:8px;background:#2e8b3a;border-radius:999px;padding:2px 8px;font:800 11px system-ui}
 .skin.prem{border-color:#d4af3766;background:linear-gradient(#0b2a3c,#1a1630)}
@@ -174,10 +186,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
      Seasonal skins can only be EARNED during their season, but once earned they're yours forever. */
   const QS = new URLSearchParams(location.search);
   const SEASON = (() => { const q = QS.get("season"); if (q === "none") return null; if (q === "halloween" || q === "christmas") return q;
-    const d = new Date(), m = d.getMonth() + 1, day = d.getDate();
-    if (m === 10 || (m === 11 && day <= 2)) return "halloween";
-    if ((m === 11 && day >= 20) || m === 12 || (m === 1 && day <= 2)) return "christmas";
-    return null; })();
+    return window.LongshipSim.seasonOf(new Date()); })();   // dates live in sim.js (SEASON_DATES)
   const THEMES = {
     halloween: { tag: "🎃 HALLOWED SEAS", sub: "The dead have set sail. Limited-time skins until November 2.", toast: ["🎃 Hallowed Seas!", "Beware the Flying Dutchman..."],
       sea: ["#2b1846", "#0c0616"], wave: "rgba(196,150,255,.075)", edge: "rgba(6,2,12,.62)", line: "rgba(255,140,26,.35)",
@@ -281,7 +290,20 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   ];
   const RAINBOW = ["#ff5c5c", "#ffb35c", "#ffe95c", "#7dff5c", "#5cffd6", "#5cb8ff", "#9b7dff", "#ff7de9"];
 
-  const inSeason = it => !it.season || it.season === SEASON;
+  /* seasonal items, live (the Wardrobe re-checks every second while open):
+       on   = in season now (leaving = in its last 24 hours)   · soon = the next season, shown greyed out 2 days early
+       off  = out of season (hidden unless you own it) */
+  function seasonState(it, now = Date.now()) {
+    if (!it.season) return { s: "on" };
+    const S = window.LongshipSim, cur = S.seasonAt(now);
+    if (cur && cur.id === it.season) return { s: "on", end: cur.end, leaving: cur.end - now < 864e5 };
+    const nx = S.nextSeason(now);
+    if (nx && nx.id === it.season && nx.start - now <= S.PREVIEW_MS) return { s: "soon", start: nx.start };
+    return { s: "off" };
+  }
+  const inSeason = it => seasonState(it).s === "on";
+  const untilText = ms => { ms = Math.max(0, ms); const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4), sec = Math.floor(ms % 6e4 / 1e3);
+    return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${String(sec).padStart(2, "0")}s`; };
   const ROGUE_SKIN = { id: "rogue", a: "#1b1b1b", b: "#c0392b", shape: "kite", pat: "cross", hull: ["#050505", "#1f1f1f", "#c0392b"], sail: ["#1b1b1b", "#c0392b"], sailPat: "torn", emb: "skull", embC: "#e8e8e8", wake: "crimson" };
 
   /* ===================== setup ===================== */
@@ -305,7 +327,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   // Gold Runes wallet: filled from the server (/api/store/wallet) after sign-in. Premium skins count as owned only if it lists them.
   const wallet = { runes: 0, owned: [], ok: false };
   const unlocked = it => it.un.t === "premium" ? wallet.owned.includes(it.id)
-    : it.un.t === "free" || prof.owned.includes(it.id) || (it.un.t === "ach" && prof.ach[it.un.key]);
+    : it.un.t === "free" || prof.owned.includes(it.id) || wallet.owned.includes(it.id) || (it.un.t === "ach" && prof.ach[it.un.key]);
   function achieve(key) {
     if (prof.ach[key]) return; prof.ach[key] = true; saveProf();
     const it = [...SKINS, ...FIGS, ...TRAILS].find(x => x.un.t === "ach" && x.un.key === key);
@@ -407,7 +429,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   function newOfflineWorld() {
     world = new Sim.World({ season: SEASON, hooks: {
       add: dress,
-      sink: (s, by, how) => { if (s === player) onPlayerSunk({ by: by ? by.name : null, how, peak: s.peak || s.len, kills: s.kills }); else if (by === player) onKill(s); },
+      sink: (s, by, how) => { if (by && by.skin && by.skin.fx) victimFx(s, by.skin); if (s === player) onPlayerSunk({ by: by ? by.name : null, how, peak: s.peak || s.len, kills: s.kills }); else if (by === player) onKill(s); },
       ward: s => { if (s === player) onWardSave(); },
       grant: (s, p, hit) => { if (s === player) onGrant(p, hit); },
       struck: (v, by, lost) => { if (v === player) onStruck(by ? by.name : null, lost); },
@@ -533,7 +555,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     ws.onclose = () => { clearTimeout(give); if (net.ws === ws) netLost(); else if (!got) paintLobby(); };
     ws.onerror = () => {};
   }
-  function lookMsg() { const l = myLook(); return { skin: l.skinId, fig: l.fig, trail: l.trailId }; }
+  function lookMsg() { const l = myLook(), sk = SKINS.find(k => k.id === l.skinId);
+    return Object.assign({ skin: l.skinId, fig: l.fig, trail: l.trailId }, sk && sk.premium && acct.tok ? { tok: acct.tok } : {}); }   // the lobby checks premium skins with the server
   function netInit(m) {
     net.on = true; net.lobby = m.lobby; net.max = m.max; net.humans = m.pc || 0; net.watching = m.pv || 0; world = null; player = null; net.meId = 0;
     net.byId.clear(); net.goldById.clear();
@@ -575,6 +598,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     if (m.t === "pong") return;
     if (m.t !== "s") return;
     const now = performance.now();
+    if (m.vx) for (const [id, sk] of m.vx) { const s = net.byId.get(id); if (s) victimFx(s, SKINS.find(k => k.id === sk)); }
+    if (m.mu) for (const [id, sk] of m.mu) { const s = net.byId.get(id); if (s) { s.skinId = sk; dress(s); } }
     if (m.md) for (const id of m.md) { const s = net.byId.get(id); if (s && s === player) continue; delNetShip(id); }
     if (m.ma) for (const d of m.ma) addNetShip(d);
     if (m.gd) for (const id of m.gd) { const g = net.goldById.get(id); if (g) { g.eaten = true; net.goldById.delete(id); } }
@@ -1061,6 +1086,50 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     c.restore();
     if (sk.fx) drawSkinFx(c, sk, segs, r, vis);
   }
+  /* victim effects: a ship sunk by a god skin goes out in that god's style (seen by everyone nearby)
+       Thor → struck by lightning · Odin → feathers burst and ravens carry it off · Loki → green fire */
+  const vfx = [];
+  function victimFx(s, sk) {
+    if (!sk || !sk.fx || !s.segs || !s.segs.length) return;
+    const r = radius(s), n = s.segs.length, step = Math.max(1, Math.floor(n / 14)), pts = [];
+    for (let i = 0; i < n; i += step) pts.push({ x: s.segs[i].x, y: s.segs[i].y });
+    vfx.push({ k: sk.fx, pts, r, t0: tick, a: s.a || 0, done: {} }); if (vfx.length > 10) vfx.shift();
+  }
+  function drawRaven(c, x, y, an, s, flap) {
+    c.save(); c.translate(x, y); c.rotate(an);
+    c.beginPath(); c.moveTo(s * .9, 0); c.lineTo(0, -s * .25); c.quadraticCurveTo(-s * .9, -s * (1.3 + flap), -s * 1.6, -s * (.6 + flap));
+    c.quadraticCurveTo(-s * .6, -s * .2, -s * 1.1, 0); c.quadraticCurveTo(-s * .6, s * .2, -s * 1.6, s * (.6 + flap)); c.quadraticCurveTo(-s * .9, s * (1.3 + flap), 0, s * .25); c.closePath();
+    c.fill(); c.stroke(); c.restore();
+  }
+  function drawVictimFx() {
+    const ga = ctx.globalAlpha;
+    for (let i = vfx.length - 1; i >= 0; i--) { const v = vfx[i], age = tick - v.t0, P = v.pts, r = v.r;
+      if (age > 100) { vfx.splice(i, 1); continue; }
+      if (!P.some(p => onScreen(p.x, p.y, 400))) continue;
+      const once = k => v.done[k] ? false : (v.done[k] = true);
+      if (v.k === "lightning") {   // three strikes from the sky, then sparks
+        for (let b = 0; b < 3; b++) { const t0 = b * 7, la = age - t0; if (la < 0 || la > 9) continue;
+          const p = P[(b * 5 + 2) % P.length], top = p.y - 700; let x = p.x + (b - 1) * 80, y = top;
+          ctx.globalAlpha = ga * (1 - la / 10); ctx.strokeStyle = "#e8f8ff"; ctx.lineWidth = Math.max(7, r * .6); ctx.beginPath(); ctx.moveTo(x, y);
+          for (let j = 1; j <= 7; j++) { const t = j / 7; x = p.x + (b - 1) * 80 * (1 - t) + (j < 7 ? Math.sin(v.t0 + j * 9 + b * 3) * 34 : 0); y = top + (p.y - top) * t; ctx.lineTo(x, y); }
+          ctx.stroke(); ctx.strokeStyle = "#7fd3ff"; ctx.lineWidth = Math.max(3, r * .25); ctx.stroke();
+          if (la < 3) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = .22 * (1 - la / 3); ctx.fillStyle = "#e8f8ff"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore(); }   // sky flash
+          ctx.globalAlpha = ga * .9 * (1 - la / 10); ctx.drawImage(haloSprite("#bfe9ff"), p.x - r * 8, p.y - r * 8, r * 16, r * 16);
+          if (once("s" + b)) for (const q of P) for (let k = 0; k < 2; k++) emit(q.x, q.y, "spark", rnd(-2.6, 2.6), rnd(-2.6, 2.6)); }
+      } else if (v.k === "ravens") {   // feathers burst, three ravens carry it off
+        if (once("burst")) for (const q of P) for (let k = 0; k < 5; k++) emit(q.x, q.y, "feather", rnd(-3, 3), rnd(-3, 3));
+        const p = P[0], s = Math.max(22, r * 1.6); ctx.fillStyle = "#0d0d12"; ctx.strokeStyle = "#d4af37"; ctx.lineWidth = Math.max(1, s * .08);
+        ctx.globalAlpha = ga * Math.min(1, (100 - age) / 30);
+        for (let k = 0; k < 3; k++) { const dir = -Math.PI / 2 + (k - 1) * .55, d = age * (3.2 + k * .4);
+          drawRaven(ctx, p.x + Math.cos(dir) * d, p.y + Math.sin(dir) * d, dir, s, Math.sin(age * .45 + k * 2) * .6); }
+      } else if (v.k === "shift") {   // Loki's green fire eats the wreck
+        if (age < 55 && (age | 0) % 2 === 0) for (const q of P) for (let k = 0; k < 2; k++) emit(q.x + rnd(-r, r), q.y + rnd(-r, r), "venom", rnd(-.6, .6), -rnd(1, 2.6));
+        const R = r * 3.4; ctx.globalAlpha = ga * Math.max(0, 1 - age / 70);
+        for (const q of P) ctx.drawImage(haloSprite(LOKI_COLS[(((q.x + age * 2) / 40) | 0) % 2 === 0 ? 0 : 2]), q.x - R, q.y - R, R * 2, R * 2);
+      }
+    }
+    ctx.globalAlpha = ga;
+  }
   // premium skin effects, drawn over the ship
   const LOKI_COLS = ["#3dff6e", "#c9a227", "#9b59ff"];
   function drawSkinFx(c, sk, segs, r, vis) {
@@ -1363,7 +1432,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   /* ===================== sign-in + cloud save =====================
      Sign in with Google and your plunder, skins, figureheads, trails and feats are saved to your account,
      so clearing the browser, switching phones or a new season never loses them. Uses the same Firebase project as the scoreboard. */
-  const acct = { user: null, t: 0, admin: false };
+  const acct = { user: null, t: 0, admin: false, tok: null };
+  setInterval(() => { if (acct.user) acct.user.getIdToken().then(t => acct.tok = t).catch(() => {}); }, 20 * 60 * 1000);   // tokens last an hour
   function mergeCloud(c) {
     if (!c) return;
     prof.owned = [...new Set([...(c.owned || []), ...prof.owned])];
@@ -1402,6 +1472,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
           if (acct.admin && lb.unsub) watchBoard(); try { const d = await db.collection("users").doc(u.uid).get(); mergeCloud(d.exists ? d.data() : null); } catch (e) {}
           store.set("ls_profile", JSON.stringify(prof)); cloudSave(); showPlunder(); if (!$("ward").classList.contains("hidden")) renderWard();
           if (!$("name").value && u.displayName) $("name").value = u.displayName.split(" ")[0].slice(0, 14); }
+        acct.tok = u ? await u.getIdToken().catch(() => null) : null;
         await loadWallet(); if (u) { loadCatalog(); afterCheckout(); }
         if (!$("ward").classList.contains("hidden")) renderWard();
         paintAcct();
@@ -1452,7 +1523,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     if (now - last < 10) { requestAnimationFrame(frame); return; }   // 120Hz phones: run at 60fps instead of burning 2x the battery
     const f = clamp((now - last) / (1000 / 60), 0, 3); last = now;
     step(f); drawSea(); drawIsles(); drawGold(); drawPowers(); drawParts();
-    for (const s of ships) if (!s.isPlayer) drawShip(s); if (player) drawShip(player); drawBolts();
+    for (const s of ships) if (!s.isPlayer) drawShip(s); if (player) drawShip(player); drawBolts(); drawVictimFx();
     drawSky(); drawShortsOverlay(); drawHud(); requestAnimationFrame(frame);
   }
 
@@ -1509,23 +1580,46 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     $("wardNote").classList.toggle("hidden", wtab === "store");
     if (wtab === "store") { renderStore(); return; }
     $("storeHead").classList.add("hidden");
-    const slot = SLOT[wtab], list = TAB_LIST[wtab].filter(it => (inSeason(it) || unlocked(it)) && (!it.premium || unlocked(it) || storeVisible())).sort((x, y) => (y.season === SEASON && !!SEASON) - (x.season === SEASON && !!SEASON)), eqId = prof.eq[slot];
+    const now = Date.now(), st = it => seasonState(it, now);
+    const rank = it => !it.season ? 1 : st(it).s === "on" ? 0 : st(it).s === "soon" ? 2 : 1;   // this season's items first, next season's (greyed) last
+    const slot = SLOT[wtab], list = TAB_LIST[wtab].filter(it => (st(it).s !== "off" || unlocked(it)) && (!it.premium || unlocked(it) || storeVisible()))
+      .map((it, i) => [it, i]).sort(([x, i], [y, j]) => rank(x) - rank(y) || i - j).map(([it]) => it), eqId = prof.eq[slot];
+    wardSeen = new Map(list.map(it => [it.id, unlocked(it) ? "own" : st(it).s]));
     const curSkin = SKINS.find(k => k.id === prof.eq.skin) || SKINS[0];
-    $("wardGrid").innerHTML = list.map(it => { const un = unlocked(it), eq = it.id === eqId, cat = it.premium && catalogSkin(it.id);
+    $("wardGrid").innerHTML = list.map(it => { const un = unlocked(it), eq = it.id === eqId, cat = it.premium && catalogSkin(it.id), ss = st(it), soon = !un && ss.s === "soon";
+      const rp = !un && !soon && runePrice(it.id), rbtn = rp ? `<button class="rune" data-rbuy="${it.id}" data-slot2="${slot}" ${wallet.runes < rp ? "disabled" : ""}>ᚱ ${rp.toLocaleString()} Runes</button>` : "";
+      const clock = soon ? `<span class="cd" data-cd="${ss.start}" data-pre="🔜 Arrives in ">🔜 Arrives in ${untilText(ss.start - now)}</span>`
+        : it.season && ss.leaving && !un ? `<span class="cd leave" data-cd="${ss.end}" data-pre="⏳ Leaves in ">⏳ Leaves in ${untilText(ss.end - now)}</span>` : "";
       const how = (it.season ? SEASON_LABEL[it.season] + " · " : "") + (it.un.t === "free" ? "Starter" : it.un.t === "buy" ? `${it.un.cost.toLocaleString()} plunder` : it.premium ? `✨ Premium${cat ? ` · ${cat.runes.toLocaleString()} Runes` : ""}` : it.un.label);
-      const btn = eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` : it.premium ? `<button data-gostore="1">ᚱ In the Store</button>` :
-        it.un.t === "buy" ? `<button data-buy="${it.id}" ${prof.plunder < it.un.cost ? "disabled" : ""}>Buy · ${it.un.cost.toLocaleString()}</button>` : `<button disabled>🔒 Feat</button>`;
-      return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"}">${un ? "" : `<span class="tag">🔒</span>`}<canvas width="520" height="220" data-pv="${it.id}"></canvas>
+      const btn = soon ? `<button disabled>Coming soon</button>` : eq ? `<button disabled>Equipped</button>` : un ? `<button data-eq="${it.id}">Equip</button>` : it.premium ? `<button data-gostore="1">ᚱ In the Store</button>` :
+        (it.un.t === "buy" ? `<button data-buy="${it.id}" ${prof.plunder < it.un.cost ? "disabled" : ""}>Buy · ${it.un.cost.toLocaleString()}</button>` : `<button disabled>🔒 Feat</button>`) + rbtn;
+      return `<div class="skin ${eq ? "eq" : ""} ${un ? "" : "locked"} ${soon ? "soon" : ""}" data-card="${it.id}">${un ? "" : `<span class="tag">${soon ? "🔜" : "🔒"}</span>`}${clock}<canvas width="520" height="220" data-pv="${it.id}"></canvas>
         <b>${it.name}</b>${wtab === "ships" ? `<em class="wk">${WAKE_NAME[it.wake] || ""} trail</em>` : wtab === "figs" && FIG_FX[it.id] ? `<em class="wk">✨ ${WAKE_NAME[FIG_FX[it.id][0]]}</em>` : wtab === "trails" ? `<em class="wk">${it.id === "skin" ? "Matches your skin" : it.aura ? "+ shield glow" : "No glow"}</em>` : ""}<small>${un && !eq ? "Unlocked" : eq ? "Sailing with this" : how}</small>${btn}</div>`; }).join("");
     animWard();
   }
   const SLOT = { ships: "skin", figs: "fig", trails: "trail" }, TAB_LIST = { ships: SKINS, figs: FIGS, trails: TRAILS };
+  let wardSeen = new Map();
+  setInterval(() => {
+    if ($("ward").classList.contains("hidden") || wtab === "store") return;
+    const now = Date.now();
+    document.querySelectorAll("#wardGrid [data-cd]").forEach(e => e.textContent = e.dataset.pre + untilText(+e.dataset.cd - now));
+    let changed = false;
+    for (const [id, was] of wardSeen) { if (was === "own") continue;
+      const it = TAB_LIST[wtab].find(x => x.id === id), now2 = unlocked(it) ? "own" : seasonState(it, now).s;
+      if (now2 === was) continue; changed = true;
+      const card = document.querySelector(`#wardGrid [data-card="${id}"]`);
+      if (card && now2 === "off") card.classList.add("dissolve");     // season over and you don't own it: it melts away
+      if (card && now2 === "on") card.classList.add("arrive");        // the new season's items light up
+    }
+    if (changed) setTimeout(renderWard, 1400);
+  }, 1000);
   /* ===================== Gold Runes store =====================
      Prices, Runes and premium ownership all come from the server (server/store.js). This page only shows them
      and sends the player to Stripe's own checkout page. While testing, only admin accounts can see the store. */
   const shop = { cat: null, busy: false, agree: false };
   const storeVisible = () => acct.admin || !!(shop.cat && shop.cat.public);   // public once STORE_PUBLIC=1 on the server
   const catalogSkin = id => shop.cat && shop.cat.skins.find(s => s.id === id);
+  const runePrice = id => storeVisible() && shop.cat && shop.cat.items && shop.cat.items[id] || 0;   // every non-starter cosmetic can be bought with Runes
   const money = c => "$" + (c / 100).toFixed(2);
   const RUNE_BAR = `<svg class="runebar" viewBox="0 0 84 46" aria-hidden="true"><path d="M10 34 L18 10 L70 8 L76 32 L66 40 L14 41 Z" fill="#b8860b"/><path d="M18 10 L70 8 L64 16 L24 17 Z" fill="#f2c94c"/><path d="M24 17 L64 16 L66 40 L14 41 Z" fill="#d4a017"/><path d="M38 21 L38 36 M38 21 L46 25 L38 29 L47 36" stroke="#6b4a00" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 20 l2 1 M55 33 l3-1 M60 21 l1 2" stroke="#fff3b0" stroke-width="1.5" opacity=".7"/></svg>`;
   async function storeApi(path, body) {
@@ -1561,9 +1655,9 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     $("wardGrid").innerHTML = `<div style="grid-column:1/-1"><h3 style="margin:0">ᚱ Gold Runes</h3></div>${packs}<div style="grid-column:1/-1"><h3 style="margin:12px 0 0">✨ Premium skins</h3></div>${skins}`;
     animWard();
   }
-  async function storeAction(fn) {
+  async function storeAction(fn, rerenderWard) {
     if (shop.busy) return; shop.busy = true; document.querySelectorAll("#wardGrid button").forEach(b => b.disabled = true);
-    try { await fn(); } catch (e) { toast("⚠️ " + e.message); } finally { shop.busy = false; if (wtab === "store") renderStore(); }
+    try { await fn(); } catch (e) { toast("⚠️ " + e.message); } finally { shop.busy = false; if (wtab === "store") renderStore(); else if (rerenderWard) renderWard(); }
   }
   // back from Stripe: the webhook may take a few seconds, so check the wallet a few times
   async function afterCheckout() {
@@ -1578,10 +1672,11 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 
   $("wardGrid").addEventListener("click", e => {
     const pay = e.target.closest("[data-pay]"), rbuy = e.target.closest("[data-rbuy]"), gostore = e.target.closest("[data-gostore]");
-    if ((pay || rbuy) && !shop.agree) { toast("☑️ Tick the Terms of Sale box first", "It's just above the store"); $("agreeRow").scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+    if ((pay || rbuy) && !shop.agree) { toast("☑️ Agree to the Terms of Sale first", "It's at the top of the ᚱ Store tab");
+      if (wtab === "store") $("agreeRow").scrollIntoView({ block: "center", behavior: "smooth" }); else document.querySelector('#ward [data-tab="store"]').click(); return; }
     if (pay) return storeAction(async () => { const { url } = await storeApi("checkout", { item: pay.dataset.pay }); location.href = url; });
     if (rbuy) return storeAction(async () => { const d = await storeApi("buy", { item: rbuy.dataset.rbuy }); wallet.runes = d.runes; wallet.owned = d.owned;
-      prof.eq.skin = rbuy.dataset.rbuy; saveProf(); sfx.buy(); toast("✨ Unlocked!", "It's equipped"); });
+      prof.eq[rbuy.dataset.slot2 || "skin"] = rbuy.dataset.rbuy; saveProf(); sfx.buy(); toast("✨ Unlocked!", "It's equipped"); }, wtab !== "store");
     if (gostore) { document.querySelector('#ward [data-tab="store"]').click(); return; }
     const eqs = e.target.closest("[data-slot]"); if (eqs) { prof.eq[eqs.dataset.slot] = eqs.dataset.eq; saveProf(); sfx.click(); renderStore(); return; }
     const eq = e.target.closest("[data-eq]"), buy = e.target.closest("[data-buy]");

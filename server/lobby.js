@@ -6,6 +6,10 @@
    - Lobby N only gets players once lobbies 1..N-1 are full (the game tries them in order).
    - Each player only gets updates about ships near what they're looking at. When everyone leaves, the sea stops (no cost). */
 import "../games/longship/sim.js";
+import { SKINS as STORE_SKINS, verifyIdToken, googleKeys, firestore } from "./store.js";
+// Premium skins (bought in the Gold Runes store) are only shown to other players once the server has checked
+// the player's wallet. Until then (or if they don't own it) everyone sees the starter skin instead.
+const PREMIUM = new Set(STORE_SKINS.map(s => s.id));
 const Sim = globalThis.LongshipSim;
 
 const MAX_PLAYERS = 20;   // real players per lobby (raise this when lobbies get busy)
@@ -30,7 +34,7 @@ export class Lobby {
   constructor(ctx, env) {
     this.ctx = ctx; this.env = env;
     this.conns = new Set(); this.world = null; this.loop = 0; this.lobbyNo = 0; this.nextConn = 1;
-    this.metaAdd = []; this.metaDel = new Set(); this.ticks = 0;
+    this.metaAdd = []; this.metaDel = new Set(); this.victimFx = []; this.metaUpd = []; this.ticks = 0;
   }
 
   async fetch(request) {
@@ -54,6 +58,7 @@ export class Lobby {
         L.metaDel.add(s.id);
         if (s.conn) { L.ev(s.conn, { k: "sunk", by: by ? by.name : null, how, peak: s.peak || s.len, kills: s.kills }); s.deadAt = L.world.tick; }
         if (by && by.conn) L.ev(by.conn, { k: "kill", name: s.name, kind: s.kind, boss: !!s.boss });
+        if (by && PREMIUM.has(by.skinId)) L.victimFx.push([s.id, by.skinId]);   // everyone nearby sees the god skin's victim effect
       },
       ward: s => { if (s.conn) L.ev(s.conn, { k: "ward" }); },
       struck: (v, by, lost) => { if (v.conn) L.ev(v.conn, { k: "struck", by: by ? by.name : null, lost }); },
@@ -62,7 +67,7 @@ export class Lobby {
       returned: n => { for (const c of L.conns) L.ev(c, { k: "returned", name: n.name }); },
       fix: s => { if (s.conn) L.ev(s.conn, { k: "fix", x: r1(s.x), y: r1(s.y), a: Math.round(s.a * 1000) / 1000 }); },
     } });
-    this.metaAdd = []; this.metaDel.clear();
+    this.metaAdd = []; this.metaDel.clear(); this.victimFx = []; this.metaUpd = [];
   }
 
   open(ws) {
@@ -121,13 +126,32 @@ export class Lobby {
     if (m.t === "here" || m.t === "sail") c.lastHere = now;   // a real person touched the game
     if (m.t === "hello" || m.t === "sail") {
       if (m.name !== undefined) c.name = cleanName(m.name);
-      c.look = { skinId: cleanId(m.skin) || "fjord", fig: cleanId(m.fig) || "dragon", trailId: cleanId(m.trail) };
+      c.wantSkin = cleanId(m.skin) || "fjord";
+      c.look = { skinId: this.allowedSkin(c), fig: cleanId(m.fig) || "dragon", trailId: cleanId(m.trail) };
+      if (PREMIUM.has(c.wantSkin) && typeof m.tok === "string" && m.tok.length < 4000) this.checkWallet(c, m.tok);
       if (m.t === "sail") { c.active = now; this.spawn(c); }
     } else if (m.t === "in") {
       if (Number.isFinite(m.cx) && Number.isFinite(m.cy)) c.cam = { x: Sim.clamp(m.cx, 0, Sim.W), y: Sim.clamp(m.cy, 0, Sim.W) };
       if (Number.isFinite(m.v)) c.view = Sim.clamp(m.v, 500, 2600);
       if (c.ship && c.ship.alive && Number.isFinite(m.x) && Number.isFinite(m.y)) { c.active = now; this.applyMove(c, m, now); }
     } else if (m.t === "ping") this.send(c, { t: "pong", c: m.c });
+  }
+
+  // premium skin? only if this player's wallet (checked by the server) owns it
+  allowedSkin(c) { return !PREMIUM.has(c.wantSkin) || (c.owned && c.owned.has(c.wantSkin)) ? c.wantSkin : "fjord"; }
+  async checkWallet(c, tok) {
+    const now = Date.now();
+    if (c.checking || (c.owned && c.owned.has(c.wantSkin)) || now - (c.checkedAt || 0) < 15000) return;   // at most every 15s per player
+    c.checking = true; c.checkedAt = now;
+    try {
+      const me = await verifyIdToken(tok, await googleKeys());
+      const w = await firestore(this.env).get("wallets/" + me.uid);
+      c.owned = new Set(w.data.owned || []);
+    } catch (e) { c.owned = c.owned || new Set(); }
+    c.checking = false;
+    const id = this.allowedSkin(c); c.look.skinId = id;
+    const s = c.ship;
+    if (s && s.alive && s.skinId !== id && this.world) { s.skinId = id; this.metaUpd.push([s.id, id]); }   // swap the look on everyone's screen
   }
 
   spawn(c) {
@@ -175,7 +199,7 @@ export class Lobby {
     if (!this.world) return;
     this.broadcast();
     w.goldAdded.length = 0; w.goldRemoved.length = 0; w.powersChanged = false; w.newBolts.length = 0;
-    this.metaAdd = []; this.metaDel.clear(); this.broadcastCount = false;
+    this.metaAdd = []; this.metaDel.clear(); this.victimFx = []; this.metaUpd = []; this.broadcastCount = false;
   }
 
   broadcast() {
@@ -183,6 +207,8 @@ export class Lobby {
     const shared = {};
     const added = this.metaAdd.filter(s => s.alive);
     if (added.length) shared.ma = added.map(s => this.metaMsg(s));
+    if (this.victimFx.length) shared.vx = this.victimFx;   // before md: the browser snapshots the wreck, then removes it
+    if (this.metaUpd.length) shared.mu = this.metaUpd;
     if (this.metaDel.size) shared.md = [...this.metaDel];
     if (w.goldAdded.length) shared.ga = w.goldAdded.filter(g => !g.eaten).map(g => this.goldMsg(g));
     if (w.goldRemoved.length) shared.gd = w.goldRemoved.slice();

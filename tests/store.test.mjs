@@ -1,6 +1,7 @@
 // Offline tests for server/store.js: fake Stripe, fake Google sign-in keys, and an in-memory Firestore
 // that applies writes all-or-nothing with the same preconditions and transforms the real one uses.
 // Run: node tests/store.test.mjs
+import "../sim.js";   // the season calendar (the Worker loads it through the lobby)
 import { handleStore, stripeSignatureOk, verifyIdToken, PACKS, SKINS } from "../server/store.js";
 
 let pass = 0, fail = 0;
@@ -81,7 +82,7 @@ const wallet = uid => (db.docs.get("wallets/" + uid) || { data: {} }).data;
 /* ---- tests ---- */
 // catalog
 let r = await call("catalog", { method: "GET" });
-ok(r.status === 200 && r.body.packs.length === 4 && r.body.skins.length === 3, "catalog lists 4 packs and 3 skins");
+ok(r.status === 200 && r.body.packs.length === 4 && r.body.skins.length === 3 && Object.keys(r.body.items).length >= 40, "catalog lists 4 packs, 3 premium skins and the Rune prices");
 ok(PACKS[0].cents === 299 && PACKS[0].runes === 300, "starter pack is 300 Runes for $2.99");
 ok(SKINS.every(s => s.runes === s.cents + 1), "every skin's Rune price matches its dollar price");
 
@@ -169,6 +170,18 @@ ok(wallet("bob").owned.join() === "thor", "partial refund changes nothing");
 const disp2 = await signed({ type: "charge.dispute.created", data: { object: { id: "dp_2", payment_intent: "pi_cs_4", amount: 2999, reason: "fraudulent" } } });
 r = await call("webhook", { body: disp2.raw, headers: { "stripe-signature": disp2.header } });
 ok(wallet("bob").owned.length === 0 && wallet("bob").flagged === true, "chargeback on a skin purchase removes the skin and flags the account");
+
+// every other cosmetic can be bought with Runes (Runes only, seasonal ones only in season)
+const Sim = globalThis.LongshipSim, xmasOn = Sim.seasonOf(new Date()) === "christmas";
+r = await call("catalog", { method: "GET" });
+ok(r.body.items.raven === 300 && r.body.items.valkt === 3000 && !!r.body.items.candycane === xmasOn, "catalog prices plunder/feat items in Runes (seasonal only in season)");
+const carol = await signed(paid("cs_9", "carol", "runes_550", 499)); await call("webhook", { body: carol.raw, headers: { "stripe-signature": carol.header } });
+r = await call("buy", { uid: "carol", body: { item: "raven" } });
+ok(r.status === 200 && wallet("carol").runes === 250 && wallet("carol").owned.join() === "raven", "Raven Black bought for 300 Runes");
+r = await call("checkout", { uid: "carol", body: { item: "kraken" } });
+ok(r.status === 400, "Runes-only items can't be paid for with money");
+r = await call("buy", { uid: "carol", body: { item: "candycane" } });
+ok(xmasOn ? r.status === 200 : r.status === 409, "seasonal item only sells in its season");
 
 // other players can't see or spend someone else's wallet
 r = await call("wallet", { method: "GET", uid: "mallory" });
