@@ -57,7 +57,7 @@ export const RUNE_ITEMS = Object.fromEntries([
   ["sparkt",700], ["auroratr",700], ["lightt",700], ["venomt",1500], ["bifrost",1500], ["valkt",3000],
   ["mistt",300,"halloween"], ["pleavest",300,"halloween"], ["snowt",300,"christmas"], ["candyt",300,"christmas"],
 ].map(([id, runes, season]) => [id, { id, runes, season: season || null }]));
-const seasonOn = (season, now = Date.now()) => { if (!season) return true; const S = globalThis.LongshipSim; const w = S && S.seasonAt(now); return !!(w && w.id === season); };
+const seasonOn = (season, now = Date.now()) => { if (!season) return true; const S = globalThis.LongshipSim; return !!(S && S.itemWindow(season, now)); };   // item sale window
 const onSale = (it, now = Date.now()) => (!it.from || now >= Date.parse(it.from)) && (!it.to || now < Date.parse(it.to));
 export function findItem(id) {
   const p = PACKS.find(x => x.id === id); if (p) return { kind: "pack", ...p };

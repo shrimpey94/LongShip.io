@@ -38,23 +38,29 @@
   };
   /* ---------- seasons: the ONE calendar the game, lobby and store all use ----------
      start = first day, end = first day AFTER the season (so Halloween runs Oct 1 through Nov 2).
+     The sea, bots, boss and title page follow start/end. The season's ITEMS can go on sale earlier (shopStart),
+     so Yule skins go on sale the moment the Halloween ones leave, while the sea stays normal until Nov 20.
      Days flip at midnight US Eastern (05:00 UTC). Change a date here and everything follows. */
   const SEASON_DATES = {
     halloween: { start: [10, 1],  end: [11, 3] },
-    christmas: { start: [11, 20], end: [1, 3] },
+    christmas: { start: [11, 20], end: [1, 3], shopStart: [11, 3] },
   };
   const PREVIEW_MS = 2 * 864e5;   // the next season's items show (greyed out) this long before it starts
   const at = (y, md) => Date.UTC(y, md[0] - 1, md[1], 5);
-  function seasonWindows(t) {   // every season window touching the years around time t
+  function seasonWindows(t, shop) {   // every season window touching the years around time t (shop = when its items sell)
     const y = new Date(t).getUTCFullYear(), out = [];
     for (const yy of [y - 1, y, y + 1]) for (const id in SEASON_DATES) {
-      const d = SEASON_DATES[id], start = at(yy, d.start), end = at(yy + (d.end[0] < d.start[0] ? 1 : 0), d.end);
+      const d = SEASON_DATES[id], s0 = shop && d.shopStart || d.start;
+      const start = at(yy, s0), end = at(yy + (d.end[0] < s0[0] ? 1 : 0), d.end);
       out.push({ id, start, end });
     }
     return out.sort((a, b) => a.start - b.start);
   }
   function seasonAt(t) { return seasonWindows(t).find(w => t >= w.start && t < w.end) || null; }
   function nextSeason(t) { return seasonWindows(t).find(w => w.start > t) || null; }
+  // when a season's items are on sale / next go on sale
+  function itemWindow(id, t) { return seasonWindows(t, true).find(w => w.id === id && t >= w.start && t < w.end) || null; }
+  function nextItemWindow(id, t) { return seasonWindows(t, true).find(w => w.id === id && w.start > t) || null; }
   function seasonOf(d) { const w = seasonAt(+d); return w ? w.id : null; }
   // looks the bots can wear (the browser owns the art for every id)
   const BOT_SKINS = { all: ["fjord", "glacier", "forest", "raven", "frost", "jarl", "aurora", "thunder", "kraken", "blood", "ember", "valhalla"],
@@ -413,5 +419,5 @@
   };
 
   root.LongshipSim = { W, SPEED, BOOST, TURN, BASE_LEN, BOTS, GOLD_TARGET, POWER_TARGET, PSTEP, POWERS, LOOT, LOOT_TYPES, GEM_HUES, SEASONS, MAX_SPEED,
-    seasonOf, seasonAt, nextSeason, SEASON_DATES, PREVIEW_MS, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
+    seasonOf, seasonAt, nextSeason, itemWindow, nextItemWindow, SEASON_DATES, PREVIEW_MS, rnd, clamp, angDiff, d2, radius, gap, segCount, buildSegs, pushPath, moveShip, hitIsle, Grid, World };
 })(typeof globalThis !== "undefined" ? globalThis : this);

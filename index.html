@@ -295,10 +295,10 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
        off  = out of season (hidden unless you own it) */
   function seasonState(it, now = Date.now()) {
     if (!it.season) return { s: "on" };
-    const S = window.LongshipSim, cur = S.seasonAt(now);
-    if (cur && cur.id === it.season) return { s: "on", end: cur.end, leaving: cur.end - now < 864e5 };
-    const nx = S.nextSeason(now);
-    if (nx && nx.id === it.season && nx.start - now <= S.PREVIEW_MS) return { s: "soon", start: nx.start };
+    const S = window.LongshipSim, cur = S.itemWindow(it.season, now);   // item sale windows (can open before the sea changes)
+    if (cur) return { s: "on", end: cur.end, leaving: cur.end - now < 864e5 };
+    const nx = S.nextItemWindow(it.season, now);
+    if (nx && nx.start - now <= S.PREVIEW_MS) return { s: "soon", start: nx.start };
     return { s: "off" };
   }
   const inSeason = it => seasonState(it).s === "on";
