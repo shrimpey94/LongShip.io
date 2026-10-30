@@ -81,8 +81,9 @@ const b64urlText = s => b64url(enc.encode(s));
 const unb64url = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 function sameText(a, b) { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; }
-// live keys: sk_live_ (standard secret) or rk_live_ (a secret key made with limited permissions)
-const isLiveKey = k => /^(sk|rk)_live_/.test(k || "");
+// live keys: sk_live_ (standard), rk_live_ (limited permissions) or any newer format with _live_ in it.
+// Trimmed, because a pasted secret can pick up a stray space or line break.
+const isLiveKey = k => /_live_/.test((k || "").trim());
 export function storeOpen(env) {
   const k = env.STRIPE_SECRET_KEY || "";
   if (!k || !env.FIREBASE_SA) return "The store isn't set up yet.";
@@ -184,7 +185,7 @@ const form = (o, pre = "") => Object.entries(o).flatMap(([k, v]) => {
   return v && typeof v === "object" ? form(v, key) : v === undefined ? [] : [encodeURIComponent(key) + "=" + encodeURIComponent(v)];
 });
 async function stripe(env, fetcher, method, path, body) {
-  const r = await fetcher("https://api.stripe.com/v1/" + path, { method, headers: { authorization: "Bearer " + env.STRIPE_SECRET_KEY, "content-type": "application/x-www-form-urlencoded" }, body: body && form(body).join("&") });
+  const r = await fetcher("https://api.stripe.com/v1/" + path, { method, headers: { authorization: "Bearer " + (env.STRIPE_SECRET_KEY || "").trim(), "content-type": "application/x-www-form-urlencoded" }, body: body && form(body).join("&") });
   const d = await r.json(); if (!r.ok) throw new Error("Stripe: " + ((d.error && d.error.message) || r.status));
   return d;
 }
