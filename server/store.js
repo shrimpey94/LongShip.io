@@ -67,7 +67,7 @@ export function findItem(id) {
 }
 export const publicCatalog = (env = {}) => ({
   public: env.STORE_PUBLIC === "1",                                   // everyone sees the store (else admins only)
-  mode: (env.STRIPE_SECRET_KEY || "").startsWith("sk_live_") ? "live" : "test",
+  mode: isLiveKey(env.STRIPE_SECRET_KEY) ? "live" : "test",
   packs: PACKS,
   skins: SKINS.filter(s => onSale(s)).map(({ id, name, tier, blurb, runes, cents, to }) => ({ id, name, tier, blurb, runes, cents, to: to || null })),
   items: Object.fromEntries(Object.values(RUNE_ITEMS).filter(r => seasonOn(r.season)).map(r => [r.id, r.runes])),
@@ -81,10 +81,12 @@ const b64urlText = s => b64url(enc.encode(s));
 const unb64url = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 function sameText(a, b) { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; }
+// live keys: sk_live_ (standard secret) or rk_live_ (a secret key made with limited permissions)
+const isLiveKey = k => /^(sk|rk)_live_/.test(k || "");
 export function storeOpen(env) {
   const k = env.STRIPE_SECRET_KEY || "";
   if (!k || !env.FIREBASE_SA) return "The store isn't set up yet.";
-  if (k.startsWith("sk_live_") && env.STORE_LIVE !== "1") return "Live payments are switched off until the store is tested.";
+  if (isLiveKey(k) && env.STORE_LIVE !== "1") return "Live payments are switched off until the store is tested.";
   return null;
 }
 
