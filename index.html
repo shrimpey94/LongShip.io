@@ -88,6 +88,13 @@ body.shorts #sndBar{display:none}
 #wardGrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 #acct{margin-top:10px}#acct small{margin-top:4px}#acct a{color:var(--gold)}
 .skin .wk{display:block;font:600 11px system-ui;font-style:normal;color:var(--gold);opacity:.85}
+#zapBtn{position:fixed;right:16px;bottom:128px;width:84px;height:84px;border-radius:50%;border:3px solid #ffe066;background:radial-gradient(#3a5bd9,#141c4a);color:#fff;font:900 30px/1 system-ui;display:none;
+  box-shadow:0 0 0 6px #ffe06633,0 0 24px #8fb4ff;cursor:pointer;z-index:6;animation:zapPulse 1.2s ease-in-out infinite}
+#zapBtn small{display:block;font:800 12px system-ui;margin-top:2px;color:#ffe066}
+#zapBtn.on{display:block}
+@keyframes zapPulse{50%{box-shadow:0 0 0 10px #ffe06622,0 0 34px #b8d0ff}}
+.sfill{display:block;width:84px;height:5px;border-radius:3px;background:#ffffff26;margin:3px 0 2px;overflow:hidden}
+.sfill i{display:block;height:100%;background:var(--gold);transition:width .25s}
 #boostBtn{position:fixed;left:16px;bottom:18px;width:76px;height:76px;border-radius:50%;border:2px solid #ffffff44;background:#0007;color:var(--gold);font:800 13px system-ui;display:none}
 @media (pointer:coarse){#boostBtn{display:block}}
 a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-color:#8b94ff}
@@ -174,6 +181,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   <div class="grid" id="wardGrid"></div>
   <p id="wardNote" style="max-width:760px;opacity:.75;font-size:13px;text-align:center;margin-top:14px">Earn plunder every voyage: your shield wall plus 25 for each raider you sink. Spend it here, or unlock the special skins by pulling off their feats.</p></div>
 <button id="boostBtn" aria-label="Row hard (boost)">ROW!</button>
+<button id="zapBtn" aria-label="Strike with Mjölnir">⚡<small></small></button>
 <div id="sndBar"><button id="sfxBtn" aria-label="Sound effects on or off">🔊</button><button id="musBtn" aria-label="Music on or off">🎵</button></div>
 
 <div class="screen" id="start"><div class="card">
@@ -461,6 +469,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
       sink: (s, by, how) => { if (by && by.skin && by.skin.fx) victimFx(s, by.skin); if (s === player) onPlayerSunk({ by: by ? by.name : null, how, peak: s.peak || s.len, kills: s.kills }); else if (by === player) onKill(s); },
       ward: s => { if (s === player) onWardSave(); },
       grant: (s, p, hit) => { if (s === player) onGrant(p, hit); },
+      zap: (s, hit) => { if (s === player) onZap(hit); },
       struck: (v, by, lost) => { if (v === player) onStruck(by ? by.name : null, lost); },
       eat: (s, g) => { if (s === player) onEat(g.v); },
       returned: n => toast(`${n.name} has returned...`),
@@ -472,7 +481,14 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   function onEat(v) { sfx.coin(v); if (TH && player) { player.treats = (player.treats || 0) + 1; if (player.treats === 150) achieve(TH.treatAch); } }
   function onStruck(by, lost) { toast("⚡ Struck by lightning!", `${by ? String(by).replace(/[<&]/g, "") + " shattered" : "Lost"} ${lost} of your shields`); sfx.thunder(); }
   function onWardSave() { toast("🛡️ Thor's Ward saved you!"); sfx.clang(); }
-  function onGrant(p, hit) { toast(`${p.icon} ${p.name}!`, p.note); if (p.id === "mjolnir") { sfx.thunder(); if (hit) achieve("mjolnir"); } else sfx.power(p.r); }
+  function onGrant(p, hit) { toast(`${p.icon} ${p.name}!`, p.note); sfx.power(p.r); }
+  // Mjölnir is kept until you use it: the ⚡ button (or E / F) strikes the biggest ship in front of you
+  function zap() {
+    if (!player || !player.alive || !player.buffs.mjolnir) return;
+    if (net.on) { if (net.ws && net.ws.readyState === 1) net.ws.send('{"t":"zap"}'); }
+    else if (world) world.useHeld(player);
+  }
+  function onZap(hit) { if (hit) { sfx.thunder(); achieve("mjolnir"); } else toast("⚡ No ship in range", "Your hammer is still charged"); }
   function onKill(v) {   // v: the ship you sank (name, kind, boss)
     prof.stats.sinks++; if (v.kind === "rogue") achieve("rogue");
     if (v.boss && TH) { achieve(TH.boss.ach); setTimeout(() => toast(`🏆 You sank ${v.name}!`, "Its treasure is yours"), 300); } else toast(`⚔️ ${v.name} sank!`);
@@ -517,7 +533,8 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   bb.addEventListener("touchstart", e => { input.boost = true; e.preventDefault(); }, { passive: false });
   bb.addEventListener("touchend", e => { input.boost = false; e.preventDefault(); }, { passive: false });
   const keys = new Set();
-  addEventListener("keydown", e => { if (e.code === "Space") { input.boost = true; e.preventDefault(); } keys.add(e.code); });
+  addEventListener("keydown", e => { if (e.code === "Space") { input.boost = true; e.preventDefault(); } if ((e.code === "KeyE" || e.code === "KeyF") && document.activeElement.tagName !== "INPUT") zap(); keys.add(e.code); });
+  $("zapBtn").addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); zap(); });
   addEventListener("keyup", e => { if (e.code === "Space") input.boost = false; keys.delete(e.code); });
 
   let toastT = 0;
@@ -646,7 +663,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
       if (s === player) continue;
       s.buf.push({ t: now, x, y, a: a / 100 }); if (s.buf.length > 12) s.buf.shift(); s.seen = now; s.hidden = false; }
     if (m.f) for (const [id, x, y, len] of m.f) { const s = net.byId.get(id); if (!s || s === player) continue; s.len = len; if (s.hidden) { s.x = x; s.y = y; } }
-    if (m.me && player) { const me = m.me; player.len = me.len; player.peak = me.peak; player.kills = me.kills; player.ward = me.ward; player.invuln = me.inv;
+    if (m.me && player) { const me = m.me; player.len = me.len; player.score = me.sc || 0; player.peak = me.peak; player.kills = me.kills; player.ward = me.ward; player.invuln = me.inv;
       player.buffs = {}; for (const k in me.b) player.buffs[k] = { t: me.b[k][0], max: me.b[k][1] }; }
     if (m.pc !== undefined) { net.humans = m.pc; net.watching = m.pv || 0; paintLobby(); }
     if (m.ev) for (const e of m.ev) netEvent(e);
@@ -664,6 +681,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
       case "ward": onWardSave(); break;
       case "struck": onStruck(e.by, e.lost); break;
       case "grant": onGrant(Sim.POWERS[e.p], e.hit); break;
+      case "zap": onZap(e.hit); break;
       case "eat": for (const v of e.v) onEat(v); break;
       case "returned": toast(`${e.name} has returned...`); break;
       case "kick": toast("⏸️ Seat freed after a long break", "Press Set sail to rejoin"); break;
@@ -682,7 +700,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     if (player && player.alive && running) {
       Sim.moveShip(player, f); Sim.pushPath(player); Sim.buildSegs(player);
       // hide gold you sail over right away (the server confirms a moment later)
-      const r = radius(player) + 7; for (const g of gold) if (!g.eaten && Math.abs(g.x - player.x) < r && Math.abs(g.y - player.y) < r) g.hidden = now;
+      const r = radius(player) + 7; for (const g of gold) { if (g.eaten) continue; const dx = g.x - player.x, dy = g.y - player.y; if (dx * dx + dy * dy < r * r) g.hidden = now; }
     }
     for (const s of ships) {
       if (s === player) continue;
@@ -1316,7 +1334,9 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   function drawHud() {
     if ((hudT += 1) % 6) return;
     const esc = t => t.replace(/[<&]/g, "");
-    if (player) $("hud").innerHTML = `Shield wall <b>${player.len}</b><br>Sunk ${player.kills}` + (net.on ? `<div class="lob">🌐 Lobby ${net.lobby} · ${net.humans}/${net.max} sailing${net.watching ? ` · 👀 ${net.watching}` : ""}</div>` : "") +
+    const zb = $("zapBtn"), zh = player && player.alive && player.buffs.mjolnir;
+    zb.classList.toggle("on", !!zh); if (zh) zb.querySelector("small").textContent = Math.ceil(zh.t / 60) + "s";
+    if (player) $("hud").innerHTML = `Shield wall <b>${player.len}</b><span class="sfill" title="3 loot = 1 shield"><i style="width:${Math.min(100, 100 * (player.score || 0) / 3)}%"></i></span>Sunk ${player.kills}` + (net.on ? `<div class="lob">🌐 Lobby ${net.lobby} · ${net.humans}/${net.max} sailing${net.watching ? ` · 👀 ${net.watching}` : ""}</div>` : "") +
       `<div class="buffs">${Object.entries(player.buffs).map(([k, v]) => { const p = POWERS.find(q => q.id === k); return `<div class="buff"><i>${p.icon}</i>${p.name}<span class="bar"><span style="width:${100 * v.t / v.max}%"></span></span></div>`; }).join("")}</div>`;
     const top = ships.filter(s => s.alive).sort((a, b) => b.len - a.len).slice(0, 6);
     if (player && player.alive && top[0] === player && player.len > 30) achieve("top1");

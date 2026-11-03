@@ -172,7 +172,8 @@ r = await call("webhook", { body: disp2.raw, headers: { "stripe-signature": disp
 ok(wallet("bob").owned.length === 0 && wallet("bob").flagged === true, "chargeback on a skin purchase removes the skin and flags the account");
 
 // every other cosmetic can be bought with Runes (Runes only, seasonal ones only in season)
-const Sim = globalThis.LongshipSim, xmasOn = Sim.seasonOf(new Date()) === "christmas";
+// Yule items go on sale early (shop window starts Nov 3), before the Yule sea arrives on Nov 20
+const Sim = globalThis.LongshipSim, xmasOn = !!Sim.itemWindow("christmas", Date.now());
 r = await call("catalog", { method: "GET" });
 ok(r.body.items.raven === 300 && r.body.items.valkt === 3000 && !!r.body.items.candycane === xmasOn, "catalog prices plunder/feat items in Runes (seasonal only in season)");
 const carol = await signed(paid("cs_9", "carol", "runes_550", 499)); await call("webhook", { body: carol.raw, headers: { "stripe-signature": carol.header } });
@@ -181,7 +182,7 @@ ok(r.status === 200 && wallet("carol").runes === 250 && wallet("carol").owned.jo
 r = await call("checkout", { uid: "carol", body: { item: "kraken" } });
 ok(r.status === 400, "Runes-only items can't be paid for with money");
 r = await call("buy", { uid: "carol", body: { item: "candycane" } });
-ok(xmasOn ? r.status === 200 : r.status === 409, "seasonal item only sells in its season");
+ok(xmasOn ? r.status === 402 : r.status === 409, "seasonal item only sells in its season (in season: on sale, but carol is 50 Runes short)");
 
 // other players can't see or spend someone else's wallet
 r = await call("wallet", { method: "GET", uid: "mallory" });

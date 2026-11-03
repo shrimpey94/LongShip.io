@@ -63,6 +63,7 @@ export class Lobby {
       ward: s => { if (s.conn) L.ev(s.conn, { k: "ward" }); },
       struck: (v, by, lost) => { if (v.conn) L.ev(v.conn, { k: "struck", by: by ? by.name : null, lost }); },
       grant: (s, p, hit) => { if (s.conn) L.ev(s.conn, { k: "grant", p: POWER_IDX[p.id], hit: !!hit }); },
+      zap: (s, hit) => { if (s.conn) L.ev(s.conn, { k: "zap", hit: !!hit }); },
       eat: (s, g, mult) => { if (s.conn) (s.conn.eat || (s.conn.eat = [])).push(g.v * mult); },
       returned: n => { for (const c of L.conns) L.ev(c, { k: "returned", name: n.name }); },
       fix: s => { if (s.conn) L.ev(s.conn, { k: "fix", x: r1(s.x), y: r1(s.y), a: Math.round(s.a * 1000) / 1000 }); },
@@ -134,7 +135,8 @@ export class Lobby {
       if (Number.isFinite(m.cx) && Number.isFinite(m.cy)) c.cam = { x: Sim.clamp(m.cx, 0, Sim.W), y: Sim.clamp(m.cy, 0, Sim.W) };
       if (Number.isFinite(m.v)) c.view = Sim.clamp(m.v, 500, 2600);
       if (c.ship && c.ship.alive && Number.isFinite(m.x) && Number.isFinite(m.y)) { c.active = now; this.applyMove(c, m, now); }
-    } else if (m.t === "ping") this.send(c, { t: "pong", c: m.c });
+    } else if (m.t === "zap") { if (c.ship && c.ship.alive) this.world.useHeld(c.ship); }   // the ⚡ button
+    else if (m.t === "ping") this.send(c, { t: "pong", c: m.c });
   }
 
   // premium skin? only if this player's wallet (checked by the server) owns it
@@ -234,7 +236,7 @@ export class Lobby {
     if (n.length) msg.n = n;
     if (anySeg) msg.seg = seg;
     if (me) { const b = {}; for (const k in me.buffs) b[k] = [Math.round(me.buffs[k].t), me.buffs[k].max];
-      msg.me = { len: me.len, peak: me.peak, kills: me.kills, ward: me.ward || 0, inv: Math.round(me.invuln || 0), b }; }
+      msg.me = { len: me.len, sc: me.score || 0, peak: me.peak, kills: me.kills, ward: me.ward || 0, inv: Math.round(me.invuln || 0), b }; }
     if (c.ev.length) { msg.ev = c.ev; c.ev = []; }
     this.send(c, msg);
   }

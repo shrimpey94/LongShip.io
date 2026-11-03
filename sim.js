@@ -19,7 +19,7 @@
     { id: "ward",   icon: "🛡️", name: "Thor's Ward",    r: 1, w: 13, dur: 20, note: "Survive one crash" },
     { id: "ghost",  icon: "👻", name: "Ghost Ship",     r: 2, w: 7,  dur: 7,  note: "Sail through ships" },
     { id: "mead",   icon: "🍺", name: "Mead of Plenty", r: 2, w: 6,  dur: 15, note: "Gold counts double" },
-    { id: "mjolnir",icon: "⚡", name: "Mjölnir",        r: 3, w: 3,  dur: 0,  note: "Lightning shatters the nearest rival's shield wall" },
+    { id: "mjolnir",icon: "⚡", name: "Mjölnir",        r: 3, w: 3,  dur: 50, note: "Tap ⚡ to strike the biggest ship ahead (50s)" },
   ];
   // loot drifting at sea (value = how much it grows you; 3 value = 1 shield)
   const LOOT = { coin: { v: 1, w: 80 }, silver: { v: 2, w: 9 }, amber: { v: 3, w: 5 }, gem: { v: 5, w: 3.5 }, goblet: { v: 8, w: 1.6 }, horn: { v: 12, w: .7 }, chest: { v: 25, w: 0 } };
@@ -346,20 +346,40 @@
     if (p.id === "feast") s.len += 12;
     else if (p.id === "ward") { s.ward = 1; s.buffs.ward = { t: p.dur * 60, max: p.dur * 60 }; }
     else if (p.id === "mjolnir") {
-      // lightning strikes the nearest rival within 600px: small ships (under 20 shields) sink,
-      // bigger ships lose the back half of their shield wall, which spills into the sea as loot
-      let tgt = null, best = 1e9;
-      for (const o of this.ships) { if (o === s || !o.alive) continue; const dd = d2(o.x, o.y, s.x, s.y); if (dd < 600 * 600 && dd < best) { best = dd; tgt = o; } }
-      if (tgt) {
-        const mid = tgt.segs[Math.floor(tgt.segs.length / 2)] || tgt;
-        const b = { x1: s.x, y1: s.y, x2: mid.x, y2: mid.y, t: 30 }; this.bolts.push(b); if (this.track) this.newBolts.push(b); hit = tgt;
-        if (tgt.len < 20) this.sink(tgt, s, "bolt");
-        else { const keep = Math.ceil(tgt.len / 2), lost = tgt.len - keep;
-          this.spill(tgt.segs.slice(Math.ceil(tgt.segs.length / 2)), Math.round(lost * 3 * .8)); tgt.len = keep; buildSegs(tgt);
-          if (this.h.struck) this.h.struck(tgt, s, lost); }
-      }
+      // players keep the hammer (one charge; another pickup resets the 50s clock) and strike with the ⚡ button; bots strike at once
+      if (s.human || s.kind === "player") s.buffs.mjolnir = { t: p.dur * 60, max: p.dur * 60 };
+      else hit = this.strike(s);
     } else s.buffs[p.id] = { t: p.dur * 60, max: p.dur * 60 };
     if (this.h.grant) this.h.grant(s, p, hit);
+  };
+
+  // Mjölnir's target: the biggest ship within 600px in front of the bow (inside ±60°); if nobody is ahead, the nearest ship.
+  // Small ships (under 20 shields) sink; bigger ships lose the back half of their shield wall, which spills into the sea as loot.
+  P.strike = function (s) {
+    let tgt = null, best = -1, near = null, nd = 1e9;
+    const fx = Math.cos(s.a), fy = Math.sin(s.a);
+    for (const o of this.ships) { if (o === s || !o.alive) continue; const dx = o.x - s.x, dy = o.y - s.y, dd = dx * dx + dy * dy;
+      if (dd > 600 * 600) continue;
+      if (dd < nd) { nd = dd; near = o; }
+      const d = Math.sqrt(dd) || 1, ahead = (dx * fx + dy * fy) / d > .5;
+      if (ahead && (o.len > best || (o.len === best && dd < d2(tgt.x, tgt.y, s.x, s.y)))) { best = o.len; tgt = o; } }
+    tgt = tgt || near;
+    if (!tgt) return null;
+    const mid = tgt.segs[Math.floor(tgt.segs.length / 2)] || tgt;
+    const b = { x1: s.x, y1: s.y, x2: mid.x, y2: mid.y, t: 30 }; this.bolts.push(b); if (this.track) this.newBolts.push(b);
+    if (tgt.len < 20) this.sink(tgt, s, "bolt");
+    else { const keep = Math.ceil(tgt.len / 2), lost = tgt.len - keep;
+      this.spill(tgt.segs.slice(Math.ceil(tgt.segs.length / 2)), Math.round(lost * 3 * .8)); tgt.len = keep; buildSegs(tgt);
+      if (this.h.struck) this.h.struck(tgt, s, lost); }
+    return tgt;
+  };
+  // the ⚡ button: strike if a ship is in range (the charge is kept when nobody is near)
+  P.useHeld = function (s) {
+    if (!s.alive || !s.buffs.mjolnir) return null;
+    const hit = this.strike(s);
+    if (hit) delete s.buffs.mjolnir;
+    if (this.h.zap) this.h.zap(s, hit);
+    return hit;
   };
 
   // f = frames elapsed at 60fps. Ships with s.remote are steered by a real player: their position is set from outside (already checked).
@@ -387,10 +407,15 @@
         else { this.sink(s, null, "rock"); continue; } }
       // gold: magnet pulls, then eat
       const r = radius(s) + 7, pull = s.buffs.magnet ? 190 : 0, mult = s.buffs.mead ? 2 : 1;
-      this.goldGrid.near(s.x, s.y, Math.max(r, pull), g => {
+      let ex = s.eatX, ey = s.eatY; if (ex === undefined || d2(ex, ey, s.x, s.y) > 300 * 300) { ex = s.x; ey = s.y; }   // a jump (respawn) isn't a path
+      s.eatX = s.x; s.eatY = s.y;
+      const sx = s.x - ex, sy = s.y - ey, sl = sx * sx + sy * sy, half = Math.sqrt(sl) / 2;
+      this.goldGrid.near((s.x + ex) / 2, (s.y + ey) / 2, Math.max(r, pull) + half, g => {
         if (g.eaten) return; const dd = d2(g.x, g.y, s.x, s.y);
+        let pd = dd;   // distance to the path sailed this step, not just to where the ship ended up
+        if (sl > 1) { const t = clamp(((g.x - ex) * sx + (g.y - ey) * sy) / sl, 0, 1); pd = d2(g.x, g.y, ex + sx * t, ey + sy * t); }
         if (pull && dd < pull * pull) { const d = Math.sqrt(dd) || 1; g.x += (s.x - g.x) / d * 3 * f; g.y += (s.y - g.y) / d * 3 * f; }
-        if (dd < r * r) { g.eaten = true; s.score += g.v * mult; while (s.score >= 3) { s.score -= 3; s.len++; } if (T.h.eat) T.h.eat(s, g, mult); }
+        if (pd < r * r) { g.eaten = true; s.score += g.v * mult; while (s.score >= 3) { s.score -= 3; s.len++; } if (T.h.eat) T.h.eat(s, g, mult); }
       });
       for (let i = this.powers.length - 1; i >= 0; i--) { const p = this.powers[i]; if (d2(p.x, p.y, s.x, s.y) < (r + 16) ** 2) { this.powers.splice(i, 1); this.powersChanged = true; this.grant(s, p.p); if (!s.alive) break; } }
     }
