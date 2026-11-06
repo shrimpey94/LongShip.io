@@ -354,9 +354,9 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   // then step back up once things are calm again. Desktops do the same from 2x.
   const DPR_STEPS = (COARSE ? [1.5, 1.25, 1] : [2, 1.5, 1.25, 1]).filter((d, i, a) => d <= (window.devicePixelRatio || 1) || i === a.length - 1);
   let dprLvl = 0, perfT = 0, perfN = 0, perfSlow = 0, perfCalm = 0;
-  function tuneQuality(now) {
+  function tuneQuality() {
     if (SHORTS || document.hidden) return;
-    const work = performance.now() - now; perfT += work; perfN++;
+    const work = performance.now() - last;   // last = when this frame started perfT += work; perfN++;
     if (perfN < 45) return;
     const avg = perfT / perfN; perfT = perfN = 0;
     if (avg > (COARSE ? 9 : 12)) { perfCalm = 0; if (++perfSlow >= 2 && dprLvl < DPR_STEPS.length - 1) { dprLvl++; perfSlow = 0; resize(); } }
@@ -1663,7 +1663,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     const f = clamp((now - last) / (1000 / 60), 0, 3); last = now;
     step(f); drawSea(); drawIsles(); drawGold(); drawPowers(); drawParts();
     for (const s of ships) if (!s.isPlayer) drawShip(s); if (player) drawShip(player); drawBolts(); drawVictimFx();
-    drawSky(); drawShortsOverlay(); drawHud(); tuneQuality(now); requestAnimationFrame(frame);
+    drawSky(); drawShortsOverlay(); drawHud(); tuneQuality(); requestAnimationFrame(frame);
   }
 
   // ships sail behind the title screen
