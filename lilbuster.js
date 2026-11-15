@@ -94,7 +94,9 @@
   const hand = { a: 0, set: null, ph: Math.random() * 6 };
   let respawnAt = performance.now() + 4000, mood = "gold", moodUntil = 0, goal = null, lastGoal = 0;
   const skip = new WeakSet();                 // loot he gave up on (couldn't reach it)
-  let chaseObj = null, chaseSince = 0, spin = 0, lastA = null, straightUntil = 0;
+  let chaseObj = null, chaseSince = 0, spin = 0, lastA = null, straightUntil = 0, escape = null;
+  const trail = [];                          // where he's been over the last few seconds (to catch going in circles)
+  const TURN_R = (Sim.SPEED || 1.15) / (Sim.TURN || .045);   // his turning circle: a goal inside it can only be orbited
   const shipR = s => 14 + Math.min(24, (s.len || 10) / 10);
 
   // how far we can sail along heading a before hitting a shield, a rock or the edge (up to `max`)
@@ -169,13 +171,23 @@
     // same coin for 4+ seconds = he can't get it (or it's already his): forget it
     if (goal.obj !== chaseObj) { chaseObj = goal.obj || null; chaseSince = now; }
     else if (chaseObj && now - chaseSince > 4000) { skip.add(chaseObj); chaseObj = null; goal = pickGoal(P, now); lastGoal = now; }
-    // circling guard: if he's turned more than a full loop in the last few seconds, sail straight out of it
-    if (lastA !== null) spin = spin * Math.pow(.985, f) + ang(lastA, P.a);
+    // never orbit: a goal inside his turning circle and off to the side can't be reached, only circled
+    { const gd = Math.sqrt(d2(goal.x, goal.y, P.x, P.y)), off = Math.abs(ang(P.a, Math.atan2(goal.y - P.y, goal.x - P.x)));
+      if (gd < TURN_R * 2.4 && off > 1.0) { if (goal.obj) skip.add(goal.obj); goal = { x: P.x + Math.cos(P.a) * 450, y: P.y + Math.sin(P.a) * 450, kind: "wander" }; lastGoal = now; } }
+    // circling guard (real time, not frames: OBS runs at 30fps): more than ~1 loop of turning in the last 4 s = break out
+    const dt = Math.min(200, now - (frame.last || now)); frame.last = now;
+    if (lastA !== null) spin = spin * Math.exp(-dt / 4000) + ang(lastA, P.a);
     lastA = P.a;
-    if (Math.abs(spin) > Math.PI * 2.2) { spin = 0; straightUntil = now + 1800; if (chaseObj) skip.add(chaseObj); goal = null; }
-    if (!goal) { goal = pickGoal(P, now); lastGoal = now; }
-    if (now < straightUntil) goal = { x: P.x + Math.cos(P.a) * 400, y: P.y + Math.sin(P.a) * 400, kind: "wander" };
-
+    // and he must actually GO somewhere: if he's still within a small area after 4 s, pick a spot far away and sail to it
+    trail.push({ t: now, x: P.x, y: P.y }); while (trail.length && now - trail[0].t > 4000) trail.shift();
+    const stuck = trail.length > 10 && now - trail[0].t > 3800 && Math.sqrt(d2(trail[0].x, trail[0].y, P.x, P.y)) < 110;   // he covers ~280px in 4s going straight
+    if ((Math.abs(spin) > Math.PI * 2.1 || stuck) && now > straightUntil) {
+      spin = 0; trail.length = 0; if (chaseObj) skip.add(chaseObj);
+      let ea = P.a, eb = -1; for (let k = 0; k < 12; k++) { const a = P.a + (k - 6) * .4, c = clear(P, a, 900); if (c > eb) { eb = c; ea = a; } }   // the most open water
+      escape = { x: P.x + Math.cos(ea) * 900, y: P.y + Math.sin(ea) * 900, kind: "wander" }; straightUntil = now + 3500;
+      if (order && order !== "flee") orderUntil = 0;   // a chat order that sent him in circles is over
+    }
+    if (now < straightUntil && escape) goal = escape;
     // where he wants to go, then the safest nearby heading if that way is blocked
     let want = Math.atan2(goal.y - P.y, goal.x - P.x);
     const look = 150 + Math.min(220, P.len * 1.2);
