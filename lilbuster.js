@@ -93,6 +93,8 @@
   /* ---------- the brain ---------- */
   const hand = { a: 0, set: null, ph: Math.random() * 6 };
   let respawnAt = performance.now() + 4000, mood = "gold", moodUntil = 0, goal = null, lastGoal = 0;
+  const skip = new WeakSet();                 // loot he gave up on (couldn't reach it)
+  let chaseObj = null, chaseSince = 0, spin = 0, lastA = null, straightUntil = 0;
   const shipR = s => 14 + Math.min(24, (s.len || 10) / 10);
 
   // how far we can sail along heading a before hitting a shield, a rock or the edge (up to `max`)
@@ -134,11 +136,11 @@
     }
     // loot: best value per distance, a bit biased to what's ahead (people don't U-turn for one coin)
     let g = null, bs = 0;
-    for (const o of G.gold) { const dd = Math.sqrt(d2(o.x, o.y, P.x, P.y)); if (dd > 900) continue;
+    for (const o of G.gold) { if (o.eaten || o.hidden || skip.has(o)) continue; const dd = Math.sqrt(d2(o.x, o.y, P.x, P.y)); if (dd > 900) continue;
       const ahead = Math.cos(ang(P.a, Math.atan2(o.y - P.y, o.x - P.x)));
       const sc = (o.v || 1) / (60 + dd) * (1.4 + ahead); if (sc > bs) { bs = sc; g = o; } }
-    for (const p of G.powers) { const dd = Math.sqrt(d2(p.x, p.y, P.x, P.y)); if (dd < 700) { const sc = 6 / (60 + dd); if (sc > bs) { bs = sc; g = p; } } }
-    if (g) return { x: g.x, y: g.y, kind: "gold" };
+    for (const p of G.powers) { if (skip.has(p)) continue; const dd = Math.sqrt(d2(p.x, p.y, P.x, P.y)); if (dd < 700) { const sc = 6 / (60 + dd); if (sc > bs) { bs = sc; g = p; } } }
+    if (g) return { x: g.x, y: g.y, kind: "gold", obj: g };
     const a = P.a + (Math.random() - .5); return { x: P.x + Math.cos(a) * 500, y: P.y + Math.sin(a) * 500, kind: "wander" };
   }
 
@@ -164,6 +166,15 @@
     // mood swings like a real player: mostly looting, sometimes feeling brave when big enough
     if (now > moodUntil) { mood = P.len > 60 && Math.random() < .35 ? "hunt" : "gold"; moodUntil = now + 8000 + Math.random() * 12000; }
     if (!goal || now - lastGoal > 450 || d2(goal.x, goal.y, P.x, P.y) < 40 * 40) { goal = pickGoal(P, now); lastGoal = now; }
+    // same coin for 4+ seconds = he can't get it (or it's already his): forget it
+    if (goal.obj !== chaseObj) { chaseObj = goal.obj || null; chaseSince = now; }
+    else if (chaseObj && now - chaseSince > 4000) { skip.add(chaseObj); chaseObj = null; goal = pickGoal(P, now); lastGoal = now; }
+    // circling guard: if he's turned more than a full loop in the last few seconds, sail straight out of it
+    if (lastA !== null) spin = spin * Math.pow(.985, f) + ang(lastA, P.a);
+    lastA = P.a;
+    if (Math.abs(spin) > Math.PI * 2.2) { spin = 0; straightUntil = now + 1800; if (chaseObj) skip.add(chaseObj); goal = null; }
+    if (!goal) { goal = pickGoal(P, now); lastGoal = now; }
+    if (now < straightUntil) goal = { x: P.x + Math.cos(P.a) * 400, y: P.y + Math.sin(P.a) * 400, kind: "wander" };
 
     // where he wants to go, then the safest nearby heading if that way is blocked
     let want = Math.atan2(goal.y - P.y, goal.x - P.x);
