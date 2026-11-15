@@ -503,11 +503,13 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   }
   function onZap(hit) { if (hit) { sfx.thunder(); achieve("mjolnir"); } else toast("⚡ No ship in range", "Your hammer is still charged"); }
   function onKill(v) {   // v: the ship you sank (name, kind, boss)
+    if (window.__lb && __lb.onKill) __lb.onKill(v);
     prof.stats.sinks++; if (v.kind === "rogue") achieve("rogue");
     if (v.boss && TH) { achieve(TH.boss.ach); setTimeout(() => toast(`🏆 You sank ${v.name}!`, "Its treasure is yours"), 300); } else toast(`⚔️ ${v.name} sank!`);
     if (player && player.kills >= 5) achieve("kills5"); if (prof.stats.sinks >= 25) achieve("sinks25"); saveProf(); sfx.horn();
   }
   function onPlayerSunk(r) {   // r: { by, how, peak, kills }
+    if (window.__lb && __lb.onSunk) __lb.onSunk(r);
     const s = player; if (s) { s.alive = false; s.kills = r.kills; s.peak = r.peak; }
     sfx.sunk(); sfx.boost(false); lastRun = { score: r.peak, kills: r.kills, skin: s.skin, fig: s.fig, trail: s.trail };
     if (store.get(REF_KEY)) claimInvite();   // came through a friend's invite link: this finished voyage makes it count
@@ -646,6 +648,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
     const s = { id, name, kind, skinId, fig, trailId, boss: !!boss, human: !!human, alive: true, hidden: true, x: 0, y: 0, a: 0, len: BASE_LEN, kills: 0, peak: BASE_LEN, buf: [], path: [], segs: [], buffs: {} };
     dress(s); net.byId.set(id, s); ships.push(s);
     if (id === net.meId) adoptMe(s);
+    else if (human && window.__lb && __lb.onJoin) __lb.onJoin(s);
   }
   function delNetShip(id) { const s = net.byId.get(id); if (!s || s === player) return; net.byId.delete(id); const i = ships.indexOf(s); if (i >= 0) ships.splice(i, 1); }
   function adoptMe(s) { player = s; s.isPlayer = true; s.hidden = false; s.alive = true; s.target = s.a; }
@@ -1673,6 +1676,12 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   if (TH) $("seasonTag").innerHTML = `${TH.tag}<small>${TH.sub}</small>`;
   const best = +store.get("ls_best") || 0; if (best) $("bestLine").innerHTML = `Your best shield wall: <span class="best">${best}</span>`;
   $("go").onclick = start; $("again").onclick = start;
+  // ?lilbuster=1 : the stream bot (Lil Buster) plays this page by itself; see lilbuster.js. Normal players never load it.
+  if (QS.has("lilbuster")) {
+    window.__lb = { get player() { return player; }, get ships() { return ships; }, get gold() { return gold; }, get powers() { return powers; },
+      get isles() { return isles; }, get running() { return running; }, get warnIsle() { return warnIsle; }, input, cam, net, Sim, toast, start, zap };
+    const sc = document.createElement("script"); sc.src = "lilbuster.js?v=1"; document.body.appendChild(sc);
+  }
   function showPlunder() { document.querySelectorAll("[data-plunder]").forEach(e => e.textContent = prof.plunder.toLocaleString()); }
   let wtab = "ships";
   // wardrobe previews are animated while the wardrobe is open (particles are worked out from the clock, so no state to keep)
