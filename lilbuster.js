@@ -42,6 +42,22 @@
   function shout(a, b) { big.innerHTML = a + (b ? `<small>${b}</small>` : ""); big.classList.add("on"); clearTimeout(bigT); bigT = setTimeout(() => big.classList.remove("on"), 4500); }
   const esc = t => String(t).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
 
+  /* ---------- clips for the daily video (OBS Replay Buffer) ----------
+     In OBS, the Browser source needs Page permissions = "Basic access to OBS" and the Replay Buffer turned on.
+     When he sinks (or sinks a real player), OBS saves the last 30 s and we write one LBCLIP line to the OBS log
+     so the nightly script knows who/what was in that clip. */
+  const OBS = window.obsstudio;
+  let lastClip = 0;
+  function keepReplay() { try { if (OBS && OBS.startReplayBuffer) OBS.startReplayBuffer(); } catch (e) {} }
+  keepReplay(); setInterval(keepReplay, 60000);
+  function clip(info) {
+    const now = Date.now(); if (!OBS || !OBS.saveReplayBuffer || now - lastClip < 20000) return;
+    lastClip = now;
+    setTimeout(() => {   // a moment later, so the sinking itself is in the clip
+      try { console.error("LBCLIP " + JSON.stringify(Object.assign({ t: Date.now() }, info))); OBS.saveReplayBuffer(); } catch (e) {}
+    }, 2500);
+  }
+
   /* ---------- today's numbers ---------- */
   const day = () => new Date().toDateString();
   let S = { day: day(), best: 0, sunk: 0, sinks: 0, by: "", sailingFor: "" };
@@ -56,8 +72,10 @@
     if (human) { S.by = by; shout(`💀 ${esc(by)} SANK LIL BUSTER!`, "You can be next 👉 busterrdust.com/games"); say(`💀 <b>${esc(by)}</b> sank Lil Buster!`); }
     else say(r.how === "rock" ? "🪨 Lil Buster hit a rock. Classic." : r.how === "edge" ? "🌊 Lil Buster sailed off the map 😭" : `💥 Lil Buster crashed into ${esc(by || "a ship")}`);
     save(); respawnAt = performance.now() + 3500;
+    clip({ kind: "sunk", by: by || "", human: !!human, how: r.how || "", peak: r.peak || 0 });
   };
-  G.onKill = v => { S.sinks++; save(); if (v.human) { shout(`⚔️ Lil Buster sank ${esc(v.name)}!`, "Revenge? 👉 busterrdust.com/games"); say(`⚔️ Lil Buster sank <b>${esc(v.name)}</b>`); } };
+  G.onKill = v => { S.sinks++; save(); if (v.human || v.kind === "player") {   // online the server says kind "player" for real people shout(`⚔️ Lil Buster sank ${esc(v.name)}!`, "Revenge? 👉 busterrdust.com/games"); say(`⚔️ Lil Buster sank <b>${esc(v.name)}</b>`);
+    clip({ kind: "kill", by: v.name || "", human: true, how: "", peak: (G.player && G.player.len) || 0 }); } };
   G.onJoin = s => { if (s.name === NAME) return; shout(`⚔️ ${esc(s.name)} joined the sea!`, "Get him!"); say(`⛵ <b>${esc(s.name)}</b> joined the sea`); };
 
   /* ---------- Twitch chat (read-only, anonymous) ---------- */
