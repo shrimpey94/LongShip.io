@@ -7,6 +7,7 @@
   const G = window.__lb, Sim = G.Sim, W = Sim.W || 8000;
   const QS = new URLSearchParams(location.search), CHANNEL = (QS.get("twitch") || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
   const NAME = "Lil Buster🤖";
+  const CHALLENGE_URL = "busterrdust.com/sink";
   const $ = id => document.getElementById(id);
   const ang = (a, b) => Sim.angDiff(a, b);
   const d2 = (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2;
@@ -33,7 +34,7 @@
   @keyframes lbIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}`;
   document.head.appendChild(css);
   const box = (id, html) => { const d = document.createElement("div"); d.id = id; d.className = "lbx"; d.innerHTML = html; document.body.appendChild(d); return d; };
-  box("lbTop", `<b>🤖 LIL BUSTER · a bot that sails all day</b><span>SINK HIM 👉 busterrdust.com/games</span><small>Free · no download · phone or computer · you'll show up right here</small>`);
+  box("lbTop", `<b>🤖 LIL BUSTER · SINK THE BOT</b><span>JOIN HIS SEA</span><small>Daily, 1–11 PM Eastern · ${CHALLENGE_URL}</small><small>Watch &amp; chat: twitch.tv/Busterrdust · Free, no download</small>`);
   box("lbSide", `<h3>Boss him around in chat</h3><div><code>!hunt</code><code>!flee</code><code>!gold</code><code>!boost</code></div><div id="lbFeed"></div>`);
   const stats = box("lbStats", ""), modeEl = box("lbMode", ""), big = box("lbBig", "");
   const feed = $("lbFeed");
@@ -69,12 +70,13 @@
     S.sunk++; S.best = Math.max(S.best, r.peak || 0);
     const by = r.by && String(r.by);
     const human = by && G.ships.some(s => s.name === by && s.human);
-    if (human) { S.by = by; shout(`💀 ${esc(by)} SANK LIL BUSTER!`, "You can be next 👉 busterrdust.com/games"); say(`💀 <b>${esc(by)}</b> sank Lil Buster!`); }
+    if (human) { S.by = by; shout(`💀 ${esc(by)} SANK LIL BUSTER!`, `Join the sea 👉 ${CHALLENGE_URL}`); say(`💀 <b>${esc(by)}</b> sank Lil Buster!`); }
     else say(r.how === "rock" ? "🪨 Lil Buster hit a rock. Classic." : r.how === "edge" ? "🌊 Lil Buster sailed off the map 😭" : `💥 Lil Buster crashed into ${esc(by || "a ship")}`);
     save(); respawnAt = performance.now() + 3500;
     clip({ kind: "sunk", by: by || "", human: !!human, how: r.how || "", peak: r.peak || 0 });
   };
-  G.onKill = v => { S.sinks++; save(); if (v.human || v.kind === "player") {   // online the server says kind "player" for real people shout(`⚔️ Lil Buster sank ${esc(v.name)}!`, "Revenge? 👉 busterrdust.com/games"); say(`⚔️ Lil Buster sank <b>${esc(v.name)}</b>`);
+  G.onKill = v => { S.sinks++; save(); if (v.human || v.kind === "player") {   // online the server says kind "player" for real people
+    shout(`⚔️ Lil Buster sank ${esc(v.name)}!`, `Revenge? 👉 ${CHALLENGE_URL}`); say(`⚔️ Lil Buster sank <b>${esc(v.name)}</b>`);
     clip({ kind: "kill", by: v.name || "", human: true, how: "", peak: (G.player && G.player.len) || 0 }); } };
   G.onJoin = s => { if (s.name === NAME) return; shout(`⚔️ ${esc(s.name)} joined the sea!`, "Get him!"); say(`⛵ <b>${esc(s.name)}</b> joined the sea`); };
 

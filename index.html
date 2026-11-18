@@ -48,6 +48,9 @@ canvas{display:block;width:100vw;height:100vh}
 .card h1 span{color:var(--gold)}
 #seasonTag{display:none;margin:8px 0 0;font:800 18px system-ui;letter-spacing:.04em}
 #seasonTag small{display:block;font:600 13px system-ui;opacity:.85;margin-top:3px;letter-spacing:0}
+.challenge-notice{margin:10px auto;padding:10px 12px;max-width:360px;border:1px solid #e7b54a66;border-radius:12px;background:#e7b54a1c;font-size:13px;line-height:1.4}
+.challenge-notice a{color:var(--gold)}
+.card button:disabled{opacity:.55;cursor:wait}
 body.season-halloween #seasonTag{display:block;color:#ff8c1a;text-shadow:0 0 14px #ff8c1a88}
 body.season-christmas #seasonTag{display:block;color:#ff6b6b;text-shadow:0 0 14px #ffffff55}
 body.season-halloween .screen{background:radial-gradient(circle at 50% 40%,#2a1840d8,#0d0716f2)}
@@ -187,6 +190,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 <div class="screen" id="start"><div class="card">
   <h1>LONG<span>SHIP</span>.io</h1>
   <div id="seasonTag"></div>
+  <div id="challengeNotice" class="challenge-notice hidden">⚔️ <b>Sink Lil Buster</b><br>Daily, 1–11 PM Eastern while live on <a href="https://www.twitch.tv/busterrdust" target="_blank" rel="noopener">Twitch</a>. You’ll join the challenge sea.</div>
   <div id="lobby"></div>
   <p>Gather drifting gold to grow your shield wall. If your prow touches another ship's shields or a rocky isle, you sink. Most raiders sail careful, but watch for the <b style="color:#ff8a7a">☠ rogues</b>.</p>
   <input id="name" maxlength="14" placeholder="Your Viking name" autocomplete="off">
@@ -220,6 +224,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
      Switches automatically by date. Override for testing / recording: ?season=halloween | christmas | none
      Seasonal skins can only be EARNED during their season, but once earned they're yours forever. */
   const QS = new URLSearchParams(location.search);
+  const SINK_CHALLENGE = QS.has("sink");
   const SEASON = (() => { const q = QS.get("season"); if (q === "none") return null; if (q === "halloween" || q === "christmas") return q;
     return window.LongshipSim.seasonOf(new Date()); })();   // dates live in sim.js (SEASON_DATES)
   const THEMES = {
@@ -524,6 +529,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   }
 
   function start() {
+    if (SINK_CHALLENGE && !net.on) { paintLobby(); return; }
     const nm = ($("name").value.trim() || "You").slice(0, 14); store.set("ls_name", nm);
     $("start").classList.add("hidden"); $("over").classList.add("hidden"); stopBoard();
     audioInit(); sfx.start();
@@ -591,30 +597,37 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 
   /* ===================== multiplayer lobbies =====================
      The game joins the oldest lobby with a free seat (Lobby 1, then 2, ...). Each lobby is one shared sea run by the server.
+     The Sink Lil Buster challenge stays in Lobby 1 so players meet the stream bot.
      Your own ship moves instantly on your screen and the server checks every move; everyone else glides along about 0.1s behind.
      If the server can't be reached, everything quietly falls back to the bots-only sea. Add ?offline=1 to the address to force that. */
   const ONLINE_OK = !QS.has("offline") && !SHORTS && /^https?:$/.test(location.protocol) && "WebSocket" in window;
   const NET_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/games/longship/lobby";
-  const net = { on: false, tried: false, ws: null, lobby: 0, max: 20, humans: 0, watching: 0, lastHere: 0, sentHere: -1e9, byId: new Map(), goldById: new Map(), meId: 0, lastSend: 0, lastView: 0, sailing: false };
+  const net = { on: false, tried: false, ws: null, lobby: 0, max: 20, humans: 0, watching: 0, lastHere: 0, sentHere: -1e9, byId: new Map(), goldById: new Map(), meId: 0, lastSend: 0, lastView: 0, sailing: false, challengeFull: false, connectionFailed: false };
   const INTERP = 100;   // ms other ships are shown behind real time, so their movement looks smooth
   function netConnect(n) {
     net.tried = true; net.connAt = performance.now();
-    if (n > 60) return;
-    let ws; try { ws = new WebSocket(NET_URL + "?n=" + n); } catch (e) { return; }
+    if (SINK_CHALLENGE) { net.challengeFull = false; net.connectionFailed = false; paintLobby(); }
+    if (n > 60 || (SINK_CHALLENGE && n !== 1)) return;
+    let ws; try { ws = new WebSocket(NET_URL + "?n=" + n); } catch (e) { if (SINK_CHALLENGE) { net.connectionFailed = true; paintLobby(); } return; }
     let got = false;
     const give = setTimeout(() => { if (!got) { try { ws.close(); } catch (e) {} } }, 7000);
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-      if (m.t === "full") { got = true; clearTimeout(give); ws.onclose = null; ws.close(); netConnect(n + 1); return; }   // this lobby is full: try the next one
+      if (m.t === "full") { got = true; clearTimeout(give); ws.onclose = null; ws.close();
+        if (SINK_CHALLENGE) { net.challengeFull = true; paintLobby(); return; }
+        netConnect(n + 1); return; }   // this lobby is full: try the next one
       if (m.t === "init") {
         got = true; clearTimeout(give);
-        if ((m.season || null) !== (SEASON || null) || running) { ws.onclose = null; ws.close(); return; }   // a different season (testing) or mid-voyage offline: stay offline
+        if ((m.season || null) !== (SEASON || null) || running) {
+          ws.onclose = null; ws.close();
+          if (SINK_CHALLENGE) { net.connectionFailed = true; paintLobby(); }
+          return; }   // a different season (testing) or mid-voyage offline: stay offline
         net.ws = ws; netInit(m); return;
       }
       if (net.ws === ws) netMsg(m);
     };
     ws.onopen = () => ws.send(JSON.stringify(Object.assign({ t: "hello", v: 1, name: ($("name").value.trim() || "Viking").slice(0, 14) }, lookMsg())));
-    ws.onclose = () => { clearTimeout(give); if (net.ws === ws) netLost(); else if (!got) paintLobby(); };
+    ws.onclose = () => { clearTimeout(give); if (net.ws === ws) netLost(); else if (!got) { if (SINK_CHALLENGE) net.connectionFailed = true; paintLobby(); } };
     ws.onerror = () => {};
   }
   function lookMsg() { const l = myLook(), sk = SKINS.find(k => k.id === l.skinId);
@@ -745,7 +758,10 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   }
   function paintLobby() {
     const el = $("lobby"); if (!el) return;
-    el.innerHTML = net.on ? `🌐 Lobby ${net.lobby} · <b>${net.humans}</b>/${net.max} sailing${net.watching ? ` · 👀 ${net.watching} watching` : ""}` : ONLINE_OK && net.tried ? "🤖 Bots-only sea" : "";
+    if (net.on) el.innerHTML = `🌐 Lobby ${net.lobby} · <b>${net.humans}</b>/${net.max} sailing${net.watching ? ` · 👀 ${net.watching} watching` : ""}`;
+    else if (SINK_CHALLENGE) el.textContent = !ONLINE_OK ? "The challenge needs an online connection." : net.challengeFull ? "Lil Buster’s sea is full. Reload in a moment to try again." : net.connectionFailed ? "Couldn’t reach Lil Buster’s sea. Reload to try again." : net.tried ? "Connecting to Lil Buster’s sea…" : "";
+    else el.textContent = ONLINE_OK && net.tried ? "🤖 Bots-only sea" : "";
+    if (SINK_CHALLENGE) { $("go").disabled = !net.on; $("again").disabled = !net.on; }
   }
 
   /* ===================== drawing ===================== */
@@ -1671,7 +1687,9 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
 
   // ships sail behind the title screen
   newOfflineWorld(); player = null;
-  if (ONLINE_OK) netConnect(1);   // join a real lobby (falls back to bots-only if the server can't be reached)
+  if (SINK_CHALLENGE) $("challengeNotice").classList.remove("hidden");
+  if (ONLINE_OK) netConnect(1);   // join a real lobby; only regular play falls back to bots-only
+  else if (SINK_CHALLENGE) paintLobby();
   $("name").value = store.get("ls_name") || "";
   if (TH) $("seasonTag").innerHTML = `${TH.tag}<small>${TH.sub}</small>`;
   const best = +store.get("ls_best") || 0; if (best) $("bestLine").innerHTML = `Your best shield wall: <span class="best">${best}</span>`;
