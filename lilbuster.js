@@ -25,6 +25,10 @@
   #lbSide h3{margin:0 0 6px;font:900 22px system-ui;color:#4fc3f7}
   #lbSide code{background:#ffc94a;color:#14243a;border-radius:6px;padding:1px 7px;font:900 19px system-ui;text-shadow:none;margin-right:4px}
   #lbFeed div{margin-top:6px;font:700 19px system-ui;animation:lbIn .3s}
+  #lbPoll{left:50%;bottom:24px;transform:translateX(-50%);width:520px;background:rgba(8,20,36,.82);border:3px solid #ffc94a;border-radius:16px;padding:12px 18px;font:800 24px system-ui;display:none}
+  #lbPoll h3{margin:0 0 6px;font:900 24px system-ui;color:#ffc94a}#lbPoll h3 span{float:right;color:#fff}
+  #lbPoll code{background:#ffc94a;color:#14243a;border-radius:6px;padding:0 9px;margin-right:8px;text-shadow:none}#lbPoll b{float:right;color:#4fc3f7}
+  #lbPoll small{display:block;margin-top:6px;font:700 17px system-ui;opacity:.8}
   #lbStats{left:24px;bottom:24px;background:rgba(8,20,36,.72);border-radius:14px;padding:12px 18px;font:800 22px system-ui;line-height:1.45}
   #lbStats em{font-style:normal;color:#ffc94a}
   #lbMode{left:50%;top:200px;transform:translateX(-50%);font:900 30px system-ui;background:rgba(8,20,36,.6);border-radius:14px;padding:6px 18px}
@@ -35,13 +39,58 @@
   document.head.appendChild(css);
   const box = (id, html) => { const d = document.createElement("div"); d.id = id; d.className = "lbx"; d.innerHTML = html; document.body.appendChild(d); return d; };
   box("lbTop", `<b>🤖 LIL BUSTER · SINK THE BOT</b><span>JOIN HIS SEA</span><small>Daily, 1–11 PM Eastern · ${CHALLENGE_URL}</small><small>Watch &amp; chat: twitch.tv/Busterrdust · Free, no download</small>`);
-  box("lbSide", `<h3>Boss him around in chat</h3><div><code>!hunt</code><code>!flee</code><code>!gold</code><code>!boost</code></div><div id="lbFeed"></div>`);
+  box("lbSide", `<h3>Boss him around in chat</h3><div><code>!hunt</code><code>!flee</code><code>!gold</code><code>!boost</code></div><div style="font:700 16px system-ui;opacity:.85;margin-top:4px">Plus chat votes every few minutes</div><div id="lbFeed"></div>`);
   const stats = box("lbStats", ""), modeEl = box("lbMode", ""), big = box("lbBig", "");
   const feed = $("lbFeed");
   function say(html) { const d = document.createElement("div"); d.innerHTML = html; feed.prepend(d); while (feed.children.length > 6) feed.lastChild.remove(); }
   let bigT = 0;
   function shout(a, b) { big.innerHTML = a + (b ? `<small>${b}</small>` : ""); big.classList.add("on"); clearTimeout(bigT); bigT = setTimeout(() => big.classList.remove("on"), 4500); }
   const esc = t => String(t).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+
+  /* ---------- his voice ----------
+     A small helper on the streaming PC (scripts/lil-buster/lilbuster_voice.py, started by Lil-Buster-Go-Live.bat)
+     turns a line into speech with the Kokoro voices. If it isn't running he just stays quiet. */
+  const VOICE_URL = "http://127.0.0.1:8765";
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const voiceQ = []; let voiceBusy = false, voiceOff = 0, lastTalk = 0;
+  function talk(text, urgent) {
+    const now = performance.now();
+    if (now < voiceOff) return;
+    if (!urgent && now - lastTalk < 6000) return;            // don't talk over himself all the time
+    if (voiceQ.length >= 2) { if (!urgent) return; voiceQ.shift(); }
+    lastTalk = now; voiceQ.push(text); playNext();
+  }
+  async function playNext() {
+    if (voiceBusy || !voiceQ.length) return;
+    voiceBusy = true; const text = voiceQ.shift();
+    try {
+      const r = await fetch(VOICE_URL + "/say?text=" + encodeURIComponent(text));
+      if (!r.ok) throw new Error(r.status);
+      const url = URL.createObjectURL(await r.blob()), au = new Audio(url); au.volume = 1;
+      await new Promise(res => { au.onended = au.onerror = res; au.play().catch(res); setTimeout(res, 15000); });
+      URL.revokeObjectURL(url);
+    } catch (e) { voiceOff = performance.now() + 60000; voiceQ.length = 0; }   // helper not running: try again in a minute
+    voiceBusy = false; playNext();
+  }
+  const sayName = n => String(n || "").replace(/[_\d]+$/, "").replace(/_/g, " ").slice(0, 20) || "matey";
+  const LINES = {
+    greet: ["Ahoy {n}! Welcome aboard. Type hunt and I'll go wreck somebody.", "Oh look, {n} showed up! Bow before Lil Buster!",
+            "{n}! Finally, someone with taste. Type a command, I dare you.", "Welcome, {n}! Think you can sink me? Come try."],
+    hunt: ["Hunting time! {n} wants blood!", "Fine, {n}, I'll go wreck someone. Watch and learn.", "You got it, {n}. Nobody is safe!"],
+    flee: ["Run away?! Ugh, fine, {n}. Tactical retreat!", "{n} says flee. I'm not scared, I'm just... fast.", "Okay okay, {n}, I'm running!"],
+    gold: ["Treasure! {n} knows what I like.", "Gold hunting for {n}. Shiny!", "Money money money! Thanks, {n}."],
+    boost: ["Full speed! Hold on, {n}!", "Rowing hard for {n}!", "Ka-chow! That one's for {n}."],
+    sunkHuman: ["Nooo! {n}, I will remember this!", "{n} got me! Lucky shot. Total luck.", "Okay {n}, you got me. Rematch. Right now.",
+                "Ugh! {n} sank me! Everybody saw nothing!"],
+    sunkOther: ["Who put that there?!", "I meant to do that.", "Nope. Didn't happen. Respawning.", "That ship came out of nowhere!", "Ouch. Okay. Again!"],
+    rock: ["A rock! Who put a rock in the ocean?!", "That rock has it out for me."], edge: ["The edge of the world! I found it. Ow."],
+    killHuman: ["Get wrecked, {n}!", "Sorry {n}! Not sorry.", "Ha! {n} thought they could take me!", "{n} is now fish food!"],
+    joinSea: ["A challenger! {n} just joined my sea.", "{n} is in my waters. Brave. Very brave.", "Uh oh, {n} is here. Come get me!"],
+    pollStart: ["Vote time! What should I do next? Type one, two, or three.", "Chat, you're the captain. Vote one, two, or three!"],
+    pollWin: ["Chat has spoken: {o}!", "{o} it is! Let's go!", "You heard them: {o}!"],
+    lurkers: ["If you just showed up: type exclamation hunt and I'll go after someone. Or join my sea and sink me yourself!"],
+  };
+  const line = (k, n, o) => pick(LINES[k]).replace(/\{n\}/g, sayName(n)).replace(/\{o\}/g, o || "");
 
   /* ---------- clips for the daily video (OBS Replay Buffer) ----------
      In OBS, the Browser source needs Page permissions = "Basic access to OBS" and the Replay Buffer turned on.
@@ -70,18 +119,19 @@
     S.sunk++; S.best = Math.max(S.best, r.peak || 0);
     const by = r.by && String(r.by);
     const human = by && G.ships.some(s => s.name === by && s.human);
-    if (human) { S.by = by; shout(`💀 ${esc(by)} SANK LIL BUSTER!`, `Join the sea 👉 ${CHALLENGE_URL}`); say(`💀 <b>${esc(by)}</b> sank Lil Buster!`); }
-    else say(r.how === "rock" ? "🪨 Lil Buster hit a rock. Classic." : r.how === "edge" ? "🌊 Lil Buster sailed off the map 😭" : `💥 Lil Buster crashed into ${esc(by || "a ship")}`);
+    if (human) { S.by = by; shout(`💀 ${esc(by)} SANK LIL BUSTER!`, `Join the sea 👉 ${CHALLENGE_URL}`); say(`💀 <b>${esc(by)}</b> sank Lil Buster!`); talk(line("sunkHuman", by), true); }
+    else if (Math.random() < .5) talk(line(r.how === "rock" ? "rock" : r.how === "edge" ? "edge" : "sunkOther"));
+    if (!human) say(r.how === "rock" ? "🪨 Lil Buster hit a rock. Classic." : r.how === "edge" ? "🌊 Lil Buster sailed off the map 😭" : `💥 Lil Buster crashed into ${esc(by || "a ship")}`);
     save(); respawnAt = performance.now() + 3500;
     clip({ kind: "sunk", by: by || "", human: !!human, how: r.how || "", peak: r.peak || 0 });
   };
   G.onKill = v => { S.sinks++; save(); if (v.human || v.kind === "player") {   // online the server says kind "player" for real people
-    shout(`⚔️ Lil Buster sank ${esc(v.name)}!`, `Revenge? 👉 ${CHALLENGE_URL}`); say(`⚔️ Lil Buster sank <b>${esc(v.name)}</b>`);
+    shout(`⚔️ Lil Buster sank ${esc(v.name)}!`, `Revenge? 👉 ${CHALLENGE_URL}`); say(`⚔️ Lil Buster sank <b>${esc(v.name)}</b>`); talk(line("killHuman", v.name), true);
     clip({ kind: "kill", by: v.name || "", human: true, how: "", peak: (G.player && G.player.len) || 0 }); } };
-  G.onJoin = s => { if (s.name === NAME) return; shout(`⚔️ ${esc(s.name)} joined the sea!`, "Get him!"); say(`⛵ <b>${esc(s.name)}</b> joined the sea`); };
+  G.onJoin = s => { if (s.name === NAME) return; shout(`⚔️ ${esc(s.name)} joined the sea!`, "Get him!"); say(`⛵ <b>${esc(s.name)}</b> joined the sea`); talk(line("joinSea", s.name), true); };
 
   /* ---------- Twitch chat (read-only, anonymous) ---------- */
-  const MODES = { hunt: "🗡️ HUNTING", flee: "🏃 RUNNING AWAY", gold: "💰 LOOT HUNTING", boost: "💨 ROWING HARD" };
+  const MODES = { hunt: "🗡️ HUNTING", flee: "🏃 RUNNING AWAY", gold: "💰 LOOT HUNTING", boost: "💨 ROWING HARD", explore: "🧭 EXPLORING" };
   let order = null, orderUntil = 0, boostUntil = 0;
   const lastBy = new Map(), seen = new Set();
   function command(user, cmd) {
@@ -92,17 +142,61 @@
     else { order = cmd; orderUntil = now + 20000; }
     S.sailingFor = user; save();
     say(`📣 <b>${esc(user)}</b> says <b>${cmd.toUpperCase()}</b>!`);
+    talk(line(cmd, user), true);   // chat bossing him around always gets a reaction
   }
+  // greetings: by name when someone first chats (Twitch also "joins" lots of lurker bots, so joins only get a no-name hello now and then)
+  const toGreet = []; let lastGreet = 0, lastLurk = 0;
+  setInterval(() => {
+    const now = performance.now();
+    if (toGreet.length && now - lastGreet > 15000) { lastGreet = now; talk(line("greet", toGreet.shift()), true); toGreet.length = Math.min(toGreet.length, 2); }
+  }, 2000);
+
+  /* ---------- chat votes: every few minutes chat picks his next move ---------- */
+  const POLL_OPTS = [["hunt", "Hunt the biggest ship"], ["gold", "Treasure hunt"], ["flee", "Run and hide"], ["boost", "Speed demon"], ["explore", "Sail to a far corner"]];
+  const pollBox = box("lbPoll", "");
+  let poll = null, nextPoll = performance.now() + 90000;
+  function startPoll() {
+    const opts = POLL_OPTS.slice().sort(() => Math.random() - .5).slice(0, 3);
+    poll = { opts, votes: new Map(), until: performance.now() + 40000 };
+    talk(line("pollStart"), true); drawPoll();
+  }
+  function drawPoll() {
+    if (!poll) { pollBox.style.display = "none"; return; }
+    const n = [0, 0, 0]; poll.votes.forEach(v => n[v]++);
+    const left = Math.max(0, Math.ceil((poll.until - performance.now()) / 1000));
+    pollBox.style.display = "block";
+    pollBox.innerHTML = `<h3>🗳️ What should Lil Buster do next? <span>${left}s</span></h3>` +
+      poll.opts.map((o, i) => `<div><code>${i + 1}</code> ${o[1]} <b>${n[i]}</b></div>`).join("") + `<small>Type 1, 2 or 3 in chat</small>`;
+  }
+  function endPoll() {
+    const n = [0, 0, 0]; poll.votes.forEach(v => n[v]++);
+    const total = n[0] + n[1] + n[2];
+    if (total) {
+      const w = n.indexOf(Math.max(...n)), [cmd, label] = poll.opts[w];
+      if (cmd === "boost") boostUntil = performance.now() + 6000; else { order = cmd; orderUntil = performance.now() + 30000; if (cmd === "explore") exploreAt = null; }
+      say(`🗳️ Chat voted: <b>${label}</b> (${n[w]} vote${n[w] > 1 ? "s" : ""})`); talk(line("pollWin", null, label), true);
+    }
+    poll = null; drawPoll(); nextPoll = performance.now() + 150000 + Math.random() * 60000;
+  }
+  setInterval(() => {
+    const now = performance.now();
+    if (poll) { if (now > poll.until) endPoll(); else drawPoll(); return; }
+    if (now > nextPoll && !(order && now < orderUntil)) startPoll();
+  }, 1000);
+  let exploreAt = null;
   function chat(user, text) {
-    if (!seen.has(user)) { seen.add(user); say(`👋 Welcome aboard, <b>${esc(user)}</b>!`); }
+    if (!seen.has(user)) { seen.add(user); say(`👋 Welcome aboard, <b>${esc(user)}</b>!`); toGreet.push(user); }
+    const v = /^!?\s*([123])\s*$/.exec(text.trim());
+    if (v && poll) { poll.votes.set(user, +v[1] - 1); drawPoll(); return; }
     const m = /^!(hunt|flee|gold|boost)\b/i.exec(text.trim()); if (m) command(user, m[1].toLowerCase());
   }
   function twitch() {
     if (!CHANNEL) return;
     const ws = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
-    ws.onopen = () => { ws.send("CAP REQ :twitch.tv/tags"); ws.send("PASS SCHMOOPIIE"); ws.send("NICK justinfan" + (10000 + Math.floor(Math.random() * 80000))); ws.send("JOIN #" + CHANNEL); };
+    ws.onopen = () => { ws.send("CAP REQ :twitch.tv/tags twitch.tv/membership"); ws.send("PASS SCHMOOPIIE"); ws.send("NICK justinfan" + (10000 + Math.floor(Math.random() * 80000))); ws.send("JOIN #" + CHANNEL); };
     ws.onmessage = e => String(e.data).split("\r\n").forEach(line => {
       if (line.startsWith("PING")) { ws.send("PONG :tmi.twitch.tv"); return; }
+      if (/ JOIN #/.test(line)) { const now = performance.now(); if (now - lastLurk > 240000 && !/justinfan/i.test(line)) { lastLurk = now; setTimeout(() => talk(LINES.lurkers[0]), 4000); } return; }
       const m = /^(?:@(\S+) )?:(\w+)!\S+ PRIVMSG #\w+ :(.*)$/.exec(line); if (!m) return;
       const dn = /(?:^|;)display-name=([^;]*)/.exec(m[1] || ""); chat((dn && dn[1]) || m[2], m[3]);
     });
@@ -147,6 +241,10 @@
 
   function pickGoal(P, now) {
     const want = (order && now < orderUntil) ? order : mood;
+    if (want === "explore") {   // chat sent him to a far corner of the map
+      if (!exploreAt || d2(exploreAt.x, exploreAt.y, P.x, P.y) < 300 * 300) exploreAt = { x: (P.x < W / 2 ? W * .82 : W * .18) + (Math.random() - .5) * 600, y: (P.y < W / 2 ? W * .82 : W * .18) + (Math.random() - .5) * 600 };
+      return { x: exploreAt.x, y: exploreAt.y, kind: "wander" };
+    }
     if (want === "hunt") {   // a smaller ship to cut off: aim in front of its prow
       let T = null, bd = 1e18;
       for (const s of G.ships) { if (s === P || !s.alive || s.hidden || s.len >= P.len * .9) continue; const dd = d2(s.x, s.y, P.x, P.y); if (dd < 900 * 900 && dd < bd) { bd = dd; T = s; } }
@@ -167,7 +265,7 @@
   }
 
   let lastF = performance.now(); const bootAt = performance.now();
-  window.__lbChat = chat;   // for testing
+  window.__lbChat = chat; window.__lbPoll = () => startPoll();   // for testing
   function frame(now) {
     requestAnimationFrame(frame);
     const P = G.player;
