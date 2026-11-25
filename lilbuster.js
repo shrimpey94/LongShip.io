@@ -100,7 +100,15 @@
   let lastClip = 0;
   function keepReplay() { try { if (OBS && OBS.startReplayBuffer) OBS.startReplayBuffer(); } catch (e) {} }
   keepReplay(); setInterval(keepReplay, 60000);
+  /* Twitch Clip on the channel when a real player is involved (the voice helper on this PC holds the Twitch key).
+     Only real-player moments, so the Clips tab stays worth watching; the helper also spaces them 90 s apart. */
+  function twitchClip(info) {
+    if (!info.human || !info.by) return;
+    const title = info.kind === "kill" ? `Lil Buster sank ${info.by} ⚔️` : `${info.by} sank Lil Buster 💀`;
+    setTimeout(() => { fetch(VOICE_URL + "/twitchclip?title=" + encodeURIComponent(title)).catch(() => {}); }, 3000);
+  }
   function clip(info) {
+    twitchClip(info);
     const now = Date.now(); if (!OBS || !OBS.saveReplayBuffer || now - lastClip < 20000) return;
     lastClip = now;
     setTimeout(() => {   // a moment later, so the sinking itself is in the clip
