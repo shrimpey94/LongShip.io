@@ -516,7 +516,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   function onPlayerSunk(r) {   // r: { by, how, peak, kills }
     if (window.__lb && __lb.onSunk) __lb.onSunk(r);
     const s = player; if (s) { s.alive = false; s.kills = r.kills; s.peak = r.peak; }
-    sfx.sunk(); sfx.boost(false); lastRun = { score: r.peak, kills: r.kills, skin: s.skin, fig: s.fig, trail: s.trail };
+    sfx.sunk(); sfx.boost(false); lastRun = { score: r.peak, kills: r.kills, skin: s && s.skin, fig: s && s.fig, trail: s && s.trail };
     if (store.get(REF_KEY)) claimInvite();   // came through a friend's invite link: this finished voyage makes it count
     running = false; const best = Math.max(+store.get("ls_best") || 0, r.peak); store.set("ls_best", best);
     const earned = r.peak + r.kills * 25; prof.plunder += earned; prof.stats.runs++; if (prof.stats.runs >= 10) achieve("runs10");
@@ -1698,7 +1698,7 @@ a.btn2.dc{display:inline-block;text-decoration:none;background:#5865f2d9;border-
   if (QS.has("lilbuster")) {
     window.__lb = { get player() { return player; }, get ships() { return ships; }, get gold() { return gold; }, get powers() { return powers; },
       get isles() { return isles; }, get running() { return running; }, get warnIsle() { return warnIsle; }, input, cam, net, Sim, toast, start, zap };
-    const sc = document.createElement("script"); sc.src = "lilbuster.js?v=6"; document.body.appendChild(sc);
+    const sc = document.createElement("script"); sc.src = "lilbuster.js?v=7"; document.body.appendChild(sc);
   }
   function showPlunder() { document.querySelectorAll("[data-plunder]").forEach(e => e.textContent = prof.plunder.toLocaleString()); }
   let wtab = "ships";

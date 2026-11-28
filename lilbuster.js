@@ -48,29 +48,17 @@
   const esc = t => String(t).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
 
   /* ---------- his voice ----------
-     A small helper on the streaming PC (scripts/lil-buster/lilbuster_voice.py, started by Lil-Buster-Go-Live.bat)
-     turns a line into speech with the Kokoro voices. If it isn't running he just stays quiet. */
-  const VOICE_URL = "http://127.0.0.1:8765";
+     OBS's browser won't let this page call the PC directly, so each line goes into OBS's log as "LBSAY {...}".
+     The helper on the streaming PC (scripts/lil-buster/lilbuster_voice.py) reads it, makes the speech with the
+     Kokoro voices, and the "Lil Buster Voice" browser source (http://127.0.0.1:8765/voice) plays it on stream.
+     If the helper isn't running he just stays quiet. */
   const pick = a => a[Math.floor(Math.random() * a.length)];
-  const voiceQ = []; let voiceBusy = false, voiceOff = 0, lastTalk = 0;
+  let lastTalk = 0;
+  const mark = (kind, o) => { try { console.error(kind + " " + JSON.stringify(Object.assign({ t: Date.now() }, o))); } catch (e) {} };
   function talk(text, urgent) {
     const now = performance.now();
-    if (now < voiceOff) return;
     if (!urgent && now - lastTalk < 6000) return;            // don't talk over himself all the time
-    if (voiceQ.length >= 2) { if (!urgent) return; voiceQ.shift(); }
-    lastTalk = now; voiceQ.push(text); playNext();
-  }
-  async function playNext() {
-    if (voiceBusy || !voiceQ.length) return;
-    voiceBusy = true; const text = voiceQ.shift();
-    try {
-      const r = await fetch(VOICE_URL + "/say?text=" + encodeURIComponent(text));
-      if (!r.ok) throw new Error(r.status);
-      const url = URL.createObjectURL(await r.blob()), au = new Audio(url); au.volume = 1;
-      await new Promise(res => { au.onended = au.onerror = res; au.play().catch(res); setTimeout(res, 15000); });
-      URL.revokeObjectURL(url);
-    } catch (e) { voiceOff = performance.now() + 60000; voiceQ.length = 0; }   // helper not running: try again in a minute
-    voiceBusy = false; playNext();
+    lastTalk = now; mark("LBSAY", { text: String(text).slice(0, 240), u: urgent ? 1 : 0 });
   }
   const sayName = n => String(n || "").replace(/[_\d]+$/, "").replace(/_/g, " ").slice(0, 20) || "matey";
   const LINES = {
@@ -98,14 +86,32 @@
      so the nightly script knows who/what was in that clip. */
   const OBS = window.obsstudio;
   let lastClip = 0;
-  function keepReplay() { try { if (OBS && OBS.startReplayBuffer) OBS.startReplayBuffer(); } catch (e) {} }
-  keepReplay(); setInterval(keepReplay, 60000);
+  /* Watchdog (needs the Browser source's Page permissions = "Full access to OBS"):
+     every minute, during his live hours, if the stream dropped (Wi-Fi blip) start it again,
+     and make sure the Replay Buffer is running so clips actually get saved. */
+  let lastRestart = 0;
+  const liveNow = () => { const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+    return (m >= 5 * 60 + 3 && m < 10 * 60 + 57) || (m >= 13 * 60 + 3 && m < 22 * 60 + 57); };   // stays clear of the 5/11/1/11 switch-overs
+  function keepReplay() {
+    try {
+      if (!OBS) return;
+      if (OBS.getStatus) OBS.getStatus(st => {
+        if (!st) return;
+        if (!st.streaming && liveNow() && OBS.startStreaming && Date.now() - lastRestart > 150000) {
+          lastRestart = Date.now(); console.error("LBWATCH stream was down, starting it again"); OBS.startStreaming();
+        }
+        if (!st.replaybuffer && OBS.startReplayBuffer) OBS.startReplayBuffer();
+      });
+      else if (OBS.startReplayBuffer) OBS.startReplayBuffer();
+    } catch (e) {}
+  }
+  setTimeout(keepReplay, 8000); setInterval(keepReplay, 60000);
   /* Twitch Clip on the channel when a real player is involved (the voice helper on this PC holds the Twitch key).
      Only real-player moments, so the Clips tab stays worth watching; the helper also spaces them 90 s apart. */
   function twitchClip(info) {
     if (!info.human || !info.by) return;
     const title = info.kind === "kill" ? `Lil Buster sank ${info.by} ⚔️` : `${info.by} sank Lil Buster 💀`;
-    setTimeout(() => { fetch(VOICE_URL + "/twitchclip?title=" + encodeURIComponent(title)).catch(() => {}); }, 3000);
+    setTimeout(() => mark("LBTWITCH", { title }), 3000);
   }
   function clip(info) {
     twitchClip(info);
