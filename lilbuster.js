@@ -87,7 +87,7 @@
   const OBS = window.obsstudio;
   let lastClip = 0;
   /* Watchdog (needs the Browser source's Page permissions = "Full access to OBS"):
-     every minute, during his live hours, if the stream dropped (Wi-Fi blip) start it again,
+     once an hour, during his live hours, if the stream dropped (Wi-Fi blip) start it again,
      and make sure the Replay Buffer is running so clips actually get saved. */
   let lastRestart = 0;
   const liveNow = () => { const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
@@ -105,7 +105,7 @@
       else if (OBS.startReplayBuffer) OBS.startReplayBuffer();
     } catch (e) {}
   }
-  setTimeout(keepReplay, 8000); setInterval(keepReplay, 60000);
+  setTimeout(keepReplay, 8000); setInterval(keepReplay, 60 * 60000);   // check once an hour (Dylan's call)
   /* Twitch Clip on the channel when a real player is involved (the voice helper on this PC holds the Twitch key).
      Only real-player moments, so the Clips tab stays worth watching; the helper also spaces them 90 s apart. */
   function twitchClip(info) {
